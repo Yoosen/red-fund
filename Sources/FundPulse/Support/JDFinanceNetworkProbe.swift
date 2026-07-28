@@ -7,6 +7,7 @@ enum JDFinanceDebugArtifacts {
         "jd-network-probe.log"
     ]
 
+    /// 删除持久化的调试产物（同步预览 JSON 与网络探测日志），用于排错后清理。
     static func removePersistedFiles(
         in directory: URL = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -61,14 +62,17 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         self.persistsEntriesToDisk = persistsEntriesToDisk
     }
 
+    /// 清空当前捕捉到的所有网络记录，用于重新开始捕捉或退出捕捉面板时复位。
     func clear() {
         entries = []
     }
 
+    /// 设置本次探测的关注目标（基金代码 + 名称 + 金额），用于优先匹配交易订单行。
     func setTargets(_ targets: [JDFinanceNetworkProbeTarget]) {
         self.targets = targets
     }
 
+    /// 记录一次 URLSession 网络响应：解析 JSON 摘要（脱敏）并写入捕捉面板，可持久化到磁盘日志。
     func recordURLSession(
         endpoint: String,
         url: URL,
@@ -89,6 +93,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         )
     }
 
+    /// 记录 WebView 注入脚本回报的请求/响应负载：解析请求体与响应体摘要并写入捕捉面板。
     func recordWebViewPayload(_ payload: Any, now: Date = .now) {
         guard let dictionary = payload as? [String: Any] else { return }
         let url = (dictionary["url"] as? String).flatMap(URL.init(string:))
@@ -110,6 +115,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         )
     }
 
+    /// 把一条解析后的网络摘要追加到捕捉列表：仅保留可见条目，超出 24 条时丢弃最旧，并按需写磁盘日志。
     private func appendEntry(
         source: JDFinanceNetworkProbeSource,
         method: String,
@@ -139,6 +145,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         }
     }
 
+    /// 从原始响应 Data 解析出顶层键与字段摘要。
     private static func summary(
         from data: Data,
         targets: [JDFinanceNetworkProbeTarget]
@@ -149,6 +156,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return summary(fromJSONObject: object, targets: targets)
     }
 
+    /// 从响应体文本（截断至 250K）解析出顶层键与字段摘要。
     private static func summary(
         fromBodyText bodyText: String?,
         targets: [JDFinanceNetworkProbeTarget]
@@ -162,6 +170,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return summary(fromJSONObject: object, targets: targets)
     }
 
+    /// 从已解析对象抽取摘要：优先交易订单行，否则账户资产字段，最后递归叶子值（脱敏后）。
     private static func summary(
         fromJSONObject object: Any,
         targets: [JDFinanceNetworkProbeTarget]
@@ -205,6 +214,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return (topLevelKeys, summaries)
     }
 
+    /// 提取账户资产类字段摘要：总资产/持仓收益/今日收益/昨日收益/累计收益等（按路径优先级取值）。
     private static func accountAssetSummaries(in object: Any) -> [String] {
         let leaves = leafValues(in: object).filter { !isSensitivePath($0.path) }
         let targets: [(path: String, label: String)] = [
@@ -228,6 +238,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         }
     }
 
+    /// 判断一个叶子值路径是否匹配目标账户资产路径（精确/前缀/后缀/包含）。
     private static func accountLeaf(_ leaf: Leaf, matches targetPath: String) -> Bool {
         let path = leaf.path.lowercased()
         return path == targetPath
@@ -236,10 +247,12 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
             || path.contains(".\(targetPath).")
     }
 
+    /// 账户叶子排序：金额(amt)优先于文本(text)，文本优先于其他。
     private static func accountLeafPrecedes(_ lhs: Leaf, _ rhs: Leaf) -> Bool {
         accountLeafPriority(lhs.path) < accountLeafPriority(rhs.path)
     }
 
+    /// 返回账户叶子路径的优先级数值（.amt=0、.text=1、其他=2）。
     private static func accountLeafPriority(_ path: String) -> Int {
         let path = path.lowercased()
         if path.hasSuffix(".amt") { return 0 }
@@ -247,6 +260,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return 2
     }
 
+    /// 从请求体文本中提取关键请求字段摘要（业务代码/产品代码/基金代码/日期范围等）。
     private static func requestSummaries(fromBodyText bodyText: String?) -> [String] {
         guard let object = requestJSONObject(fromBodyText: bodyText) else {
             return []
@@ -299,6 +313,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return summaries
     }
 
+    /// 把请求体文本解析为对象：支持纯 JSON 或 query 字符串中的 reqData 字段。
     private static func requestJSONObject(fromBodyText bodyText: String?) -> Any? {
         guard let bodyText else { return nil }
         let trimmed = bodyText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -317,6 +332,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return nil
     }
 
+    /// 对摘要去重并限长（最多 12 条），用于合并请求与响应摘要。
     private static func mergedSummaries(_ summaries: [String]) -> [String] {
         var result: [String] = []
         var seen = Set<String>()
@@ -327,6 +343,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return result
     }
 
+    /// 提取交易订单行摘要：命中目标（代码/名称）优先，逐行生成“交易记录…状态…类型”摘要并附带交易字段。
     private static func tradeOrderSummaries(
         in object: Any,
         targets: [JDFinanceNetworkProbeTarget]
@@ -365,6 +382,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return summaries
     }
 
+    /// 递归在响应对象中查找交易订单行：识别 tradeOrderVoList 或单条订单字典，并展开嵌套数组/字符串。
     private static func tradeOrderRows(in value: Any) -> [[String: Any]] {
         if let dictionary = value as? [String: Any] {
             if let rows = dictionary["tradeOrderVoList"] as? [[String: Any]] {
@@ -389,6 +407,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return []
     }
 
+    /// 启发式判断一个字典是否为交易订单行：含基金代码或名称，且至少带金额/时间/类型/状态之一。
     private static func isTradeOrderRow(_ dictionary: [String: Any]) -> Bool {
         let hasIdentity = explicitFundCode(in: dictionary) != nil
             || firstStringValue(
@@ -409,6 +428,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return hasIdentity && (hasAmount || hasTiming || hasTradeType || hasStatus)
     }
 
+    /// 判断一条交易订单行是否匹配探测目标（代码相等，或规范名称互相包含）。
     private static func tradeOrderRow(
         _ row: [String: Any],
         matches target: JDFinanceNetworkProbeTarget
@@ -431,6 +451,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
             && (rowName.contains(targetName) || targetName.contains(rowName))
     }
 
+    /// 把一条交易订单行格式化为摘要文本：代码·名称·金额·时间·状态·类型。
     private static func tradeOrderSummary(_ row: [String: Any]) -> String? {
         let code = explicitFundCode(in: row)
         let productName = firstStringValue(
@@ -494,6 +515,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         "tradeAmountText"
     ]
 
+    /// 递归遍历对象，把所有叶子值（字典键/数组下标路径 + 字符串值）收集为扁平列表。
     private static func leafValues(in value: Any, path: String = "") -> [Leaf] {
         if let dictionary = value as? [String: Any] {
             return dictionary.flatMap { key, value in
@@ -511,6 +533,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return [Leaf(path: path, key: path.components(separatedBy: ".").last ?? path, value: text)]
     }
 
+    /// 根据叶子值的路径与内容类型生成脱敏摘要：基金代码/日期时间/金额/状态/产品名称等。
     private static func safeSummary(for leaf: Leaf) -> String? {
         let path = leaf.path.lowercased()
         let value = leaf.value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -563,6 +586,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return nil
     }
 
+    /// 从字典的多个常见代码键（fundCode/productCode/jjdm 等）中提取 6 位基金代码。
     private static func explicitFundCode(in dictionary: [String: Any]) -> String? {
         let explicitCodeKeys = [
             "fundCode",
@@ -583,6 +607,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return nil
     }
 
+    /// 按候选键顺序从字典取第一个非空字符串值。
     private static func firstStringValue(in dictionary: [String: Any], keys: [String]) -> String? {
         for key in keys {
             if let value = stringValue(dictionary[key]) {
@@ -592,6 +617,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return nil
     }
 
+    /// 按候选键顺序从字典取第一个数值（字符串或 NSNumber 均可）。
     private static func firstNumericValue(in dictionary: [String: Any], keys: [String]) -> Double? {
         for key in keys {
             if let text = stringValue(dictionary[key]),
@@ -606,6 +632,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return nil
     }
 
+    /// 从字典中找第一个交易时间叶子，并归一化为“日期 + 时段（15:00 前后）”。
     private static func firstTradeTiming(in dictionary: [String: Any]) -> (date: String, timeType: PositionTimeType?)? {
         let preferredLeaves = leafValues(in: dictionary).filter { leaf in
             isTradeTimingPath(leaf.path.lowercased())
@@ -619,6 +646,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return nil
     }
 
+    /// 把混合文本中的时间戳/日期归一化为“日期 + 时段”。
     private static func normalizedDateAndTime(from value: String) -> (date: String, timeType: PositionTimeType?)? {
         let normalizedText = normalizedTimestampDate(from: value)?.rawText ?? value
         guard let date = normalizedDate(from: normalizedText) else {
@@ -627,6 +655,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return (date, explicitTimeType(from: normalizedText) ?? clockTimeType(from: normalizedText))
     }
 
+    /// 规范化基金名称用于匹配：去空白、去“中证”、转小写。
     private static func canonicalName(_ value: String) -> String {
         value
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -635,12 +664,14 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
             .lowercased()
     }
 
+    /// 把 URL 简化为“host + path”，用于面板展示接口路径。
     private static func sanitizedPath(from url: URL?) -> String {
         guard let url else { return "--" }
         let host = url.host() ?? ""
         return host.isEmpty ? url.path : "\(host)\(url.path)"
     }
 
+    /// 取路径最后两段作为简短字段名（去掉数组下标），便于阅读。
     private static func shortFieldName(_ path: String) -> String {
         path
             .split(separator: ".")
@@ -649,12 +680,14 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
             .replacingOccurrences(of: #"\[\d+\]"#, with: "", options: .regularExpression)
     }
 
+    /// 把过长文本截断到 80 字符并加省略号。
     private static func abbreviated(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.count <= 80 { return trimmed }
         return "\(trimmed.prefix(80))..."
     }
 
+    /// 判断路径是否包含敏感字段（cookie/token/订单号/账号标识等），用于脱敏过滤。
     private static func isSensitivePath(_ path: String) -> Bool {
         let normalized = path.lowercased()
         let sensitiveTokens = [
@@ -679,6 +712,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return sensitiveTokens.contains { normalized.contains($0) }
     }
 
+    /// 判断路径是否表示金额字段（含 amount/amt/money/balance，排除收益/费率/份额）。
     private static func isAmountPath(_ path: String) -> Bool {
         (path.contains("amount") || path.contains("amt") || path.contains("money") || path.contains("balance"))
             && !path.contains("income")
@@ -687,6 +721,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
             && !path.contains("share")
     }
 
+    /// 判断路径是否表示基金/产品名称字段（productName/fundName 等）。
     private static func isProductNamePath(_ path: String) -> Bool {
         path.contains("productname")
             || path.contains("fundname")
@@ -694,10 +729,12 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
             || path.contains("buyproductname")
     }
 
+    /// 判断路径是否表示状态/类型字段（status/state/type/desc/tip 等）。
     private static func isStatusPath(_ path: String) -> Bool {
         path.contains("status") || path.contains("state") || path.contains("type") || path.contains("desc") || path.contains("tip")
     }
 
+    /// 判断路径是否表示交易时间字段：含 trade/apply/create 等正向词，且不含 update/income 等负向词。
     private static func isTradeTimingPath(_ path: String) -> Bool {
         let positive = ["trade", "apply", "accept", "create", "deal", "entrust", "submit", "business", "biz", "time", "date"]
         let negative = ["update", "expect", "estimate", "income", "profit", "nav", "netvalue", "notice", "tip"]
@@ -705,6 +742,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
             && !negative.contains { path.contains($0) }
     }
 
+    /// 判断文本是否包含交易状态语义（买入/卖出/申购/赎回/确认/处理中等）。
     private static func containsTradeStatus(_ value: String) -> Bool {
         value.contains("买入")
             || value.contains("卖出")
@@ -715,11 +753,13 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
             || value.contains("处理中")
     }
 
+    /// 从任意文本中过滤出纯数字部分；若恰好为 6 位则视为基金代码并返回，否则返回 nil。
     private static func fundCode(from value: String) -> String? {
         let digits = value.filter(\.isNumber)
         return digits.count == 6 ? digits : nil
     }
 
+    /// 从文本中识别日期并归一化为 `yyyy-MM-dd`；支持中文/斜杠/点分隔以及 8 位纯数字、月日+时分等格式，并校验为合法日期。
     private static func normalizedDate(from text: String) -> String? {
         let patterns = [
             #"(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})"#,
@@ -756,6 +796,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return nil
     }
 
+    /// 把 10 位（秒）或 13 位（毫秒）时间戳归一化为日期与完整时间文本，并校验时间范围合理性。
     private static func normalizedTimestampDate(from text: String) -> (date: String, rawText: String)? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.range(of: #"^\d{10}(\d{3})?$"#, options: .regularExpression) != nil,
@@ -780,6 +821,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return (String(rawText.prefix(10)), rawText)
     }
 
+    /// 从文本中识别明确的 15:00 前后语义（如“15:00前/三点后”），返回交易时段类型。
     private static func explicitTimeType(from text: String) -> PositionTimeType? {
         let normalized = text.replacingOccurrences(of: "：", with: ":")
         if normalized.contains("15:00前")
@@ -801,6 +843,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return nil
     }
 
+    /// 从文本中识别具体时刻（如 `14:30` 或“14点”），按小时判定为 15:00 前/后，返回交易时段类型。
     private static func clockTimeType(from text: String) -> PositionTimeType? {
         let normalized = text.replacingOccurrences(of: "：", with: ":")
         let hourText = regexCaptures(pattern: #"\b([01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\b"#, in: normalized)?.first
@@ -813,6 +856,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return hour < 15 ? .before15 : .after15
     }
 
+    /// 从文本提取首个数值（支持正负号、千分位、百分号），去掉符号与单位后解析为 Double；无法解析或为空返回 nil。
     private static func numericValue(_ value: String) -> Double? {
         let match = regexCaptures(pattern: #"([+-]?[0-9][0-9,]*(?:\.[0-9]+)?)"#, in: value)?.first ?? value
         let normalized = match
@@ -829,6 +873,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return Double(normalized)
     }
 
+    /// 把任意值规整为字符串：字符串去空白、NSNumber 转字符串、字典则回退取 text/subTitle/title/amt 字段；空值返回 nil。
     private static func stringValue(_ value: Any?) -> String? {
         switch value {
         case let value as String:
@@ -846,6 +891,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         }
     }
 
+    /// 把以 `{` 或 `[` 开头的文本解析为 JSON 对象/数组；非法或非 JSON 文本返回 nil。
     private static func jsonObject(from text: String) -> Any? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("{") || trimmed.hasPrefix("["),
@@ -856,6 +902,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return try? JSONSerialization.jsonObject(with: data)
     }
 
+    /// 用正则匹配文本并返回捕获组（不含整串），无匹配或正则非法时返回 nil。
     private static func regexCaptures(pattern: String, in text: String) -> [String]? {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -873,6 +920,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         return captures
     }
 
+    /// 把一条网络记录追加写入磁盘调试日志：确保目录存在、按需滚动日志，并以“时间 来源 方法 路径 状态 字段”格式逐行写入。
     private static func appendDebugLog(_ entry: JDFinanceNetworkProbeEntry) {
         do {
             let url = debugLogURL()
@@ -901,6 +949,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         }
     }
 
+    /// 当调试日志超过 1MB 时删除旧日志，限制磁盘占用。
     private static func rotateDebugLogIfNeeded(at url: URL) {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let size = attributes[.size] as? NSNumber,
@@ -909,6 +958,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         try? FileManager.default.removeItem(at: url)
     }
 
+    /// 返回调试日志文件在 Application Support 中的完整路径（fund-pulse/jd-network-probe.log）。
     private static func debugLogURL() -> URL {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -916,6 +966,7 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
             .appending(path: "jd-network-probe.log")
     }
 
+    /// 把日期格式化为 ISO8601（含毫秒）时间戳字符串，用于调试日志前缀。
     private static func debugTimestamp(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

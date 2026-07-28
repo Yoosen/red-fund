@@ -1,24 +1,32 @@
 import Foundation
 
+/// 示例体验中的单日收益数据点。
 struct SampleDailyPerformance: Identifiable, Equatable {
     var id: Date { date }
 
+    /// 日期。
     let date: Date
+    /// 当日收益金额。
     let dailyIncome: Double
+    /// 当日收益率（百分比）。
     let dailyIncomeRate: Double
+    /// 累计收益金额。
     let cumulativeIncome: Double
 }
 
+/// 示例体验的完整数据（组合快照 + 每日表现）。
 struct SampleExperience: Equatable {
+    /// 生成时间。
     let generatedAt: Date
+    /// 示例组合快照。
     let portfolio: PortfolioSnapshot
+    /// 示例每日收益序列。
     let dailyPerformance: [SampleDailyPerformance]
 }
 
+/// 纯内存、确定性的示例数据生成器，无仓库/网络依赖，打开示例不会写入数据或触发请求。
 enum SampleExperienceFactory {
-    /// Creates an entirely in-memory, deterministic experience. It intentionally
-    /// has no repository or service dependency, so opening the sample cannot
-    /// write portfolio/history data or trigger a network request.
+    /// 生成确定性的示例组合与近 90 个交易日的每日表现。
     static func make(now: Date = .now) -> SampleExperience {
         let calendar = chinaCalendar
         let today = calendar.startOfDay(for: now)
@@ -105,6 +113,7 @@ enum SampleExperienceFactory {
         return SampleExperience(generatedAt: now, portfolio: snapshot, dailyPerformance: points)
     }
 
+    /// 上海时区、周一为首日的中文日历。
     private static var chinaCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "zh_CN")
@@ -113,6 +122,7 @@ enum SampleExperienceFactory {
         return calendar
     }
 
+    /// 用于生成示例日期文本的格式化器（MM-dd HH:mm）。
     private static let dateTextFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
@@ -121,6 +131,7 @@ enum SampleExperienceFactory {
         return formatter
     }()
 
+    /// 按指定位数四舍五入。
     private static func rounded(_ value: Double, places: Int = 2) -> Double {
         let scale = pow(10, Double(places))
         return (value * scale).rounded() / scale

@@ -1,3 +1,10 @@
+# workbuddy
+.workbuddy/
+.codebuddy/
+
+# mermaid
+mermaid*.png
+
 # Logs
 logs
 *.log

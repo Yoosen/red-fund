@@ -1,25 +1,35 @@
 import Foundation
 
+/// 市场指数与涨跌家数行情服务（东方财富 + 同花顺）。
 struct MarketIndexService {
+    /// 东方财富批量指数行情接口（主/延迟各一，用于容错）。
     private static let eastmoneyBatchQuoteEndpoints = [
         URL(string: "https://push2.eastmoney.com/api/qt/ulist.np/get")!,
         URL(string: "https://push2delay.eastmoney.com/api/qt/ulist.np/get")!
     ]
+    /// 东方财富涨跌家数接口（主/延迟各一）。
     private static let eastmoneyMarketBreadthEndpoints = [
         URL(string: "https://push2delay.eastmoney.com/api/qt/clist/get")!,
         URL(string: "https://push2.eastmoney.com/api/qt/clist/get")!
     ]
+    /// 涨跌家数单页大小。
     private static let eastmoneyMarketBreadthPageSize = 100
+    /// 涨跌家数最大页数。
     private static let eastmoneyMarketBreadthMaxPages = 80
+    /// 涨跌家数并发抓取页数。
     private static let eastmoneyMarketBreadthConcurrentPages = 8
+    /// 同花顺涨跌家数接口（兜底）。
     private static let tonghuashunMarketBreadthEndpoint = URL(string: "https://q.10jqka.com.cn/api.php")!
 
+    /// 网络会话。
     private let session: URLSession
 
+    /// 初始化，可注入会话。
     init(session: URLSession = .shared) {
         self.session = session
     }
 
+    /// 批量获取指数行情（按全部枚举顺序排列，逐端点尝试）。
     func fetchQuotes(for ids: [MarketIndexID]) async -> [MarketIndexID: MarketIndexQuote] {
         let uniqueIDs = Array(Set(ids)).sorted { lhs, rhs in
             let lhsIndex = MarketIndexID.allCases.firstIndex(of: lhs) ?? 0
@@ -31,6 +41,7 @@ struct MarketIndexService {
         return (try? await fetchEastmoneyBatchQuotes(for: uniqueIDs)) ?? [:]
     }
 
+    /// 获取全市场涨跌家数（同花顺优先，失败回退东方财富）。
     func fetchMarketBreadth() async -> MarketBreadth? {
         if let breadth = try? await fetchTonghuashunMarketBreadth() {
             return breadth
@@ -38,6 +49,7 @@ struct MarketIndexService {
         return try? await fetchEastmoneyMarketBreadth()
     }
 
+    /// 遍历东方财富批量行情端点，首个成功返回。
     private func fetchEastmoneyBatchQuotes(for ids: [MarketIndexID]) async throws -> [MarketIndexID: MarketIndexQuote] {
         var lastError: Error?
         for endpoint in Self.eastmoneyBatchQuoteEndpoints {
@@ -50,6 +62,7 @@ struct MarketIndexService {
         throw lastError ?? URLError(.badServerResponse)
     }
 
+    /// 向东方财富批量行情接口请求并解析指数行情。
     private func fetchEastmoneyBatchQuotes(
         for ids: [MarketIndexID],
         endpoint: URL
@@ -91,6 +104,7 @@ struct MarketIndexService {
         return quotes
     }
 
+    /// 从同花顺接口抓取涨跌家数与分布。
     private func fetchTonghuashunMarketBreadth() async throws -> MarketBreadth {
         var components = URLComponents(url: Self.tonghuashunMarketBreadthEndpoint, resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -117,6 +131,7 @@ struct MarketIndexService {
         )
     }
 
+    /// 从东方财富接口分页抓取全部个股涨跌幅，统计涨跌家数与分布。
     private func fetchEastmoneyMarketBreadth() async throws -> MarketBreadth {
         let firstPage = try await fetchEastmoneyMarketBreadthPage(page: 1)
         var rates = firstPage.rates
@@ -161,6 +176,7 @@ struct MarketIndexService {
         )
     }
 
+    /// 抓取东方财富涨跌家数单页（含全部个股涨跌幅）。
     private func fetchEastmoneyMarketBreadthPage(page: Int) async throws -> EastmoneyMarketBreadthPage {
         var lastError: Error?
         for endpoint in Self.eastmoneyMarketBreadthEndpoints {
@@ -199,6 +215,7 @@ struct MarketIndexService {
         throw lastError ?? URLError(.badServerResponse)
     }
 
+    /// 将涨跌幅分段统计为 10 个区间的分布桶。
     private func eastmoneyDistribution(from rates: [Double]) -> [Int] {
         var buckets = Array(repeating: 0, count: 10)
         for rate in rates {
@@ -230,6 +247,7 @@ struct MarketIndexService {
         return buckets
     }
 
+    /// 构造东方财富请求（带 Referer/UA 伪装）。
     private func marketIndexRequest(url: URL) -> URLRequest {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
@@ -242,6 +260,7 @@ struct MarketIndexService {
         return request
     }
 
+    /// 构造同花顺请求（带 Referer/UA 伪装）。
     private func tonghuashunMarketBreadthRequest(url: URL) -> URLRequest {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
@@ -255,11 +274,13 @@ struct MarketIndexService {
     }
 }
 
+/// 东方财富指数行情列表响应。
 private struct EastmoneyMarketIndexListResponse: Decodable {
     var rc: Int
     var data: EastmoneyMarketIndexListPayload?
 }
 
+/// 东方财富指数行情数据负载（items 对应 diff 字段）。
 private struct EastmoneyMarketIndexListPayload: Decodable {
     var items: [EastmoneyMarketIndexListItem]?
 
@@ -268,6 +289,7 @@ private struct EastmoneyMarketIndexListPayload: Decodable {
     }
 }
 
+/// 东方财富指数行情单条记录（字段 f12/f14/f2/f3/f4）。
 private struct EastmoneyMarketIndexListItem: Decodable {
     var code: String?
     var name: String?
@@ -284,11 +306,13 @@ private struct EastmoneyMarketIndexListItem: Decodable {
     }
 }
 
+/// 东方财富涨跌家数响应。
 private struct EastmoneyMarketBreadthResponse: Decodable {
     var rc: Int
     var data: EastmoneyMarketBreadthPayload?
 }
 
+/// 东方财富涨跌家数数据负载。
 private struct EastmoneyMarketBreadthPayload: Decodable {
     var total: Int?
     var items: [EastmoneyMarketBreadthItem]?
@@ -299,6 +323,7 @@ private struct EastmoneyMarketBreadthPayload: Decodable {
     }
 }
 
+/// 东方财富涨跌家数单条记录（涨跌幅字段 f3）。
 private struct EastmoneyMarketBreadthItem: Decodable {
     var changeRate: LossyMarketIndexNumber?
 
@@ -307,11 +332,13 @@ private struct EastmoneyMarketBreadthItem: Decodable {
     }
 }
 
+/// 东方财富涨跌家数单页结果。
 private struct EastmoneyMarketBreadthPage {
     var total: Int
     var rates: [Double]
 }
 
+/// 同花顺指数快闪响应（涨跌分布 + 涨跌停数据）。
 private struct TonghuashunIndexFlashResponse: Decodable {
     var distribution: TonghuashunBreadthPayload?
     var limitData: TonghuashunLimitPayload?
@@ -322,6 +349,7 @@ private struct TonghuashunIndexFlashResponse: Decodable {
     }
 }
 
+/// 同花顺涨跌分布负载。
 private struct TonghuashunBreadthPayload: Decodable {
     var buckets: [LossyMarketIndexInteger]?
     var risingCount: LossyMarketIndexInteger?
@@ -334,6 +362,7 @@ private struct TonghuashunBreadthPayload: Decodable {
     }
 }
 
+/// 同花顺涨跌停负载。
 private struct TonghuashunLimitPayload: Decodable {
     var latest: TonghuashunLatestLimit?
 
@@ -342,6 +371,7 @@ private struct TonghuashunLimitPayload: Decodable {
     }
 }
 
+/// 同花顺最新涨跌停计数。
 private struct TonghuashunLatestLimit: Decodable {
     var limitUpCount: LossyMarketIndexInteger?
     var limitDownCount: LossyMarketIndexInteger?
@@ -352,6 +382,7 @@ private struct TonghuashunLatestLimit: Decodable {
     }
 }
 
+/// 宽松解析浮点数字（兼容 null/Int/String/Double）。
 private struct LossyMarketIndexNumber: Decodable {
     var value: Double?
 
@@ -372,6 +403,7 @@ private struct LossyMarketIndexNumber: Decodable {
     }
 }
 
+/// 宽松解析整数（兼容 null/Int/Double/String）。
 private struct LossyMarketIndexInteger: Decodable {
     var value: Int?
 
@@ -400,6 +432,7 @@ private struct LossyMarketIndexInteger: Decodable {
     }
 }
 
+/// 空字符串转 nil 的便捷扩展。
 private extension String {
     var nilIfBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)

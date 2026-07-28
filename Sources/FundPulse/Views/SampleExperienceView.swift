@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// 示例体验视图（完全离线、不写入真实数据）。
+/// 用一组虚构基金与近 90 天示例收益，让用户在“组合 / 收益曲线 / 盈亏日历”三种视角下
+/// 预览 App 的真实呈现效果，避免一开始就录入真实持仓。
 struct SampleExperienceView: View {
     let experience: SampleExperience
     let onClose: () -> Void
@@ -58,6 +61,7 @@ struct SampleExperienceView: View {
         .background(PanelDesign.panelBackground)
     }
 
+    /// 顶部提示条：声明以下为虚构、离线、不会写入 portfolio.json 或真实收益历史。
     private var sampleNotice: some View {
         HStack(spacing: 7) {
             Image(systemName: "info.circle.fill")
@@ -76,6 +80,7 @@ struct SampleExperienceView: View {
         )
     }
 
+    /// “组合”视角：总资产 / 累计收益 / 今日收益 三张指标卡 + 示例基金列表。
     private var portfolioContent: some View {
         ScrollView {
             VStack(spacing: 10) {
@@ -112,6 +117,7 @@ struct SampleExperienceView: View {
         .scrollIndicators(.never)
     }
 
+    /// “收益曲线”视角：展示近 90 天累计收益，可拖动曲线查看每日明细。
     private var curveContent: some View {
         let selected = selectedPoint
         return ScrollView {
@@ -153,6 +159,7 @@ struct SampleExperienceView: View {
         .scrollIndicators(.never)
     }
 
+    /// “盈亏日历”视角：按月展示每日盈亏，可左右翻月、点选某天查看明细。
     private var calendarContent: some View {
         ScrollView {
             VStack(spacing: 10) {
@@ -210,12 +217,14 @@ struct SampleExperienceView: View {
         .scrollIndicators(.never)
     }
 
+    /// 当前选中的某日收益点：优先取 selectedPointID，否则取最后一天。
     private var selectedPoint: SampleDailyPerformance? {
         guard let selectedPointID else { return experience.dailyPerformance.last }
         return experience.dailyPerformance.first { Self.chinaCalendar.isDate($0.date, inSameDayAs: selectedPointID) }
             ?? experience.dailyPerformance.last
     }
 
+    /// 指标卡（标题 + 数值，按盈亏着色）。
     private func sampleMetric(title: String, value: String, tone: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
@@ -234,6 +243,7 @@ struct SampleExperienceView: View {
         .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// 示例基金列表行（名称/代码 + 金额/今日收益）。
     private func sampleFundRow(_ fund: FundPosition) -> some View {
         HStack(spacing: 9) {
             VStack(alignment: .leading, spacing: 2) {
@@ -256,6 +266,7 @@ struct SampleExperienceView: View {
         .padding(.vertical, 8)
     }
 
+    /// 日历翻月按钮：切换到上/下一个月（超出示例数据范围时禁用）。
     private func calendarNavigationButton(systemImage: String, monthOffset: Int) -> some View {
         let target = Self.chinaCalendar.date(byAdding: .month, value: monthOffset, to: visibleMonth)
         let isEnabled = target.map(monthIsWithinSample) ?? false
@@ -276,6 +287,7 @@ struct SampleExperienceView: View {
         .opacity(isEnabled ? 1 : 0.35)
     }
 
+    /// 单个日历格：有收益数据的日期显示当日盈亏并着色，可点选；无数据的日期留空。
     @ViewBuilder
     private func calendarCell(_ date: Date?) -> some View {
         if let date {
@@ -313,6 +325,7 @@ struct SampleExperienceView: View {
         }
     }
 
+    /// 把每日收益按“当天 0 点”映射到字典，供日历快速查表。
     private var performanceByDay: [Date: SampleDailyPerformance] {
         Dictionary(
             uniqueKeysWithValues: experience.dailyPerformance.map {
@@ -321,6 +334,7 @@ struct SampleExperienceView: View {
         )
     }
 
+    /// 计算当前月份需要渲染的日期数组（含前置空白占位，按周一为一周起点对齐到 7 的倍数）。
     private var calendarDays: [Date?] {
         let calendar = Self.chinaCalendar
         guard let dayRange = calendar.range(of: .day, in: .month, for: visibleMonth),
@@ -338,10 +352,12 @@ struct SampleExperienceView: View {
         return days
     }
 
+    /// 日历网格：7 列等宽。
     private var calendarColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: 5), count: 7)
     }
 
+    /// 判断某个月是否落在示例数据范围内（用于翻月按钮可用性）。
     private func monthIsWithinSample(_ month: Date) -> Bool {
         guard let first = experience.dailyPerformance.first?.date,
               let last = experience.dailyPerformance.last?.date else { return false }
@@ -352,6 +368,7 @@ struct SampleExperienceView: View {
         return next > first && start <= last
     }
 
+    /// 翻到某月后，自动选中该月最后一条有数据的收益点。
     private func selectLastPoint(in month: Date) {
         let calendar = Self.chinaCalendar
         let matches = experience.dailyPerformance.filter {
@@ -360,17 +377,20 @@ struct SampleExperienceView: View {
         selectedPointID = matches.last?.date
     }
 
+    /// 日历格用的紧凑收益文本（如 +12 / -3，四舍五入取整）。
     private func compactIncome(_ value: Double) -> String {
         let sign = value > 0 ? "+" : ""
         return "\(sign)\(Int(value.rounded()))"
     }
 
+    /// 收益着色：涨为红、跌为绿、接近 0 为次要色（与中国习惯一致）。
     private func toneColor(_ value: Double) -> Color {
         if value > 0.005 { return .red }
         if value < -0.005 { return .green }
         return .secondary
     }
 
+    /// 以中国时区/中文区域、周一为一周起点构造的日历，全文件共用。
     private static var chinaCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "zh_CN")
@@ -379,6 +399,7 @@ struct SampleExperienceView: View {
         return calendar
     }
 
+    /// “M月d日 星期X”格式（中文）日期格式化器。
     private static let fullDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
@@ -387,6 +408,7 @@ struct SampleExperienceView: View {
         return formatter
     }()
 
+    /// “yyyy年 M月”格式（中文）月份格式化器。
     private static let monthFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
@@ -396,6 +418,7 @@ struct SampleExperienceView: View {
     }()
 }
 
+/// 示例体验的三个子视图分段：组合 / 收益曲线 / 盈亏日历。
 private enum SampleExperienceSection: String, CaseIterable, Identifiable {
     case portfolio
     case curve
@@ -412,6 +435,9 @@ private enum SampleExperienceSection: String, CaseIterable, Identifiable {
     }
 }
 
+/// 纯 SwiftUI 自绘的累计收益曲线图。
+/// 用 Path 按每日累计收益绘制折线，零轴用虚线标出，支持拖拽选取某一天（DragGesture），
+/// 并按涨跌为相邻线段分别着色。坐标映射依赖 PortfolioPerformanceChartScale。
 private struct SampleIncomeChart: View {
     let points: [SampleDailyPerformance]
     @Binding var selectedID: Date?
@@ -510,11 +536,13 @@ private struct SampleIncomeChart: View {
         }
     }
 
+    /// 当前选中点在 points 中的下标：优先按 selectedID 匹配，否则取最后一天。
     private var selectedIndex: Int? {
         guard let selectedID else { return points.indices.last }
         return points.firstIndex { Calendar.current.isDate($0.date, inSameDayAs: selectedID) }
     }
 
+    /// 绘制 4 条水平网格参考线。
     private func chartGrid(size: CGSize) -> Path {
         Path { path in
             for row in 0 ... 3 {
@@ -525,6 +553,7 @@ private struct SampleIncomeChart: View {
         }
     }
 
+    /// 把第 index 个数据点的累计收益映射到图内坐标点（x 均匀分布，y 由 chartY 计算）。
     private func pointLocation(
         index: Int,
         size: CGSize,
@@ -538,6 +567,7 @@ private struct SampleIncomeChart: View {
         )
     }
 
+    /// 把收益值映射为图内 y 坐标（借助 scale.normalizedY，顶部留白 8、底部留白 20）。
     private func chartY(
         for value: Double,
         size: CGSize,
@@ -547,6 +577,7 @@ private struct SampleIncomeChart: View {
         return 8 + plotHeight * CGFloat(scale.normalizedY(for: value))
     }
 
+    /// 在 start→end 线段上按比例 fraction 线性插值，得到中间坐标点。
     private func interpolatedPoint(
         from start: CGPoint,
         to end: CGPoint,
@@ -558,6 +589,7 @@ private struct SampleIncomeChart: View {
         )
     }
 
+    /// 把图表色调（正/负/中性）映射为颜色：正红、负绿、中性次要色。
     private func color(for tone: PortfolioPerformanceChartTone) -> Color {
         switch tone {
         case .positive:

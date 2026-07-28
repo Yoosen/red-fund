@@ -24,6 +24,7 @@ struct FundTradeEditorView: View {
     @State private var referenceTask: Task<Void, Never>?
     @State private var errorMessage: String?
 
+    /// 初始化交易编辑器：买入默认金额模式、卖出默认份额模式；编辑时载入已有记录字段，新增基金可改模式。
     init(
         store: PortfolioStore,
         fund: FundPosition,
@@ -52,6 +53,7 @@ struct FundTradeEditorView: View {
         _tradeTimeType = State(initialValue: editingRecord?.tradeTimeType ?? TradingCalendar.defaultPositionTimeType())
     }
 
+    /// 渲染交易编辑界面：标题栏 + 滚动内容（表单或确认页）+ 底部按钮；进入或切换日期/时段时刷新参考净值。
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -79,6 +81,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 顶部标题栏：动作图标 + 标题/副标题 + 关闭按钮。
     private var header: some View {
         HStack(spacing: 8) {
             Image(systemName: headerSystemImage)
@@ -115,6 +118,7 @@ struct FundTradeEditorView: View {
         .frame(height: 50)
     }
 
+    /// 滚动内容区：确认态显示确认页，否则显示录入表单。
     private var content: some View {
         ScrollView {
             Group {
@@ -131,6 +135,7 @@ struct FundTradeEditorView: View {
         .scrollIndicators(.hidden)
     }
 
+    /// 表单页：基金摘要 + 交易录入 + 交易确认区，以及错误提示。
     private var formContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             fundSummary
@@ -143,6 +148,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 确认页：确认摘要 + 持仓变化预览，以及错误提示。
     private var confirmationContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             confirmationSummary
@@ -154,6 +160,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 基金信息摘要卡：名称、代码、当前份额与成本价。
     private var fundSummary: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
@@ -186,6 +193,7 @@ struct FundTradeEditorView: View {
         .overlay(cardBorder(cornerRadius: 10))
     }
 
+    /// 交易录入区：可选模式切换 + 金额/份额/费率输入（买入或卖出）。
     private var tradeInputSection: some View {
         section("交易录入") {
             if canChooseTradeMode {
@@ -220,6 +228,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 交易确认区：交易日期、时段、参考净值与确认净值日提示。
     private var tradeConfirmSection: some View {
         section("交易确认") {
             HStack(spacing: 10) {
@@ -236,6 +245,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 参考净值行：显示买入参考净值或卖出预估单价，含净值日期与加载状态。
     private var referenceNetValueRow: some View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
@@ -274,6 +284,7 @@ struct FundTradeEditorView: View {
         .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
+    /// 交易模式选择器（金额/份额），仅新增基金可切换。
     private var modeSelector: some View {
         HStack(spacing: 4) {
             ForEach(availableModes) { value in
@@ -290,6 +301,7 @@ struct FundTradeEditorView: View {
         )
     }
 
+    /// 交易时段选择器：15:00 前 / 后。
     private var timeSelector: some View {
         HStack(spacing: 4) {
             ForEach(PositionTimeType.allCases) { value in
@@ -306,6 +318,7 @@ struct FundTradeEditorView: View {
         )
     }
 
+    /// 卖出份额快捷按钮（1/4、1/3、1/2、全部），按当前持仓比例填充份额。
     private var sellShareQuickControls: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
@@ -322,6 +335,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 卖出费用输入：可在费率(%)与金额(元)之间切换并录入。
     private var sellFeeInput: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
@@ -349,6 +363,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 生成卖出份额快捷按钮：点击按份额比例回填到份额输入框。
     private func quickSellShareButton(_ title: String, fraction: Double) -> some View {
         Button {
             let currentShares = fund.migratedShares ?? 0
@@ -366,6 +381,7 @@ struct FundTradeEditorView: View {
         .focusable(false)
     }
 
+    /// 确认净值日提示：按交易日期与时段算出按哪天净值确认份额/金额。
     private var tradeDateTip: some View {
         let dateText = DateOnlyFormatter.string(from: tradeDate)
         let acceptedDate = TradingCalendar.acceptedTradeDate(positionDate: dateText, timeType: tradeTimeType)
@@ -391,6 +407,7 @@ struct FundTradeEditorView: View {
         )
     }
 
+    /// 确认摘要：列出买入/卖出的各项金额、费率、手续费、预估份额/回款与日期。
     private var confirmationSummary: some View {
         section(action == .buy ? "买入确认" : "卖出确认") {
             VStack(spacing: 9) {
@@ -426,6 +443,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 持仓变化预览：交易后份额与持仓市值的前后对比。
     private var positionPreview: some View {
         section("持仓变化预览") {
             VStack(spacing: 8) {
@@ -447,6 +465,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 底部操作栏：确认态显示“返回修改”，否则“取消”；主按钮提交或进入确认。
     private var footer: some View {
         HStack(spacing: 8) {
             Button {
@@ -488,6 +507,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 校验是否可提交：金额/份额大于 0，且买入有费率、卖出有费用（按模式）。
     private var canSubmit: Bool {
         switch effectiveMode {
         case .amount:
@@ -505,6 +525,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 标题栏副标题：随确认态/编辑态/动作变化。
     private var headerSubtitle: String {
         if isConfirming {
             return "确认后写入交易记录并更新持仓"
@@ -515,6 +536,7 @@ struct FundTradeEditorView: View {
         return action == .buy ? "记录一笔追加买入" : "记录一笔卖出赎回"
     }
 
+    /// 标题栏标题：随新增基金/确认态/动作变化。
     private var headerTitle: String {
         if isEditingInitialFund {
             return isConfirming ? "新增基金确认" : "新增基金"
@@ -525,6 +547,7 @@ struct FundTradeEditorView: View {
         return action.title
     }
 
+    /// 标题栏图标：确认态用托盘箭头，否则用加减号。
     private var headerSystemImage: String {
         if isConfirming {
             return action == .buy ? "tray.and.arrow.down.fill" : "tray.and.arrow.up.fill"
@@ -532,6 +555,7 @@ struct FundTradeEditorView: View {
         return action == .buy ? "plus" : "minus"
     }
 
+    /// 主按钮文案：随编辑/确认/加载状态变化（如“买入确认”“保存中”）。
     private var submitTitle: String {
         if editingRecord != nil {
             return isSaving ? "保存中" : (isConfirming ? "确认保存" : "保存确认")
@@ -545,30 +569,37 @@ struct FundTradeEditorView: View {
         return action == .buy ? "买入确认" : "卖出确认"
     }
 
+    /// 动作主题色：买入为红、卖出为绿。
     private var actionColor: Color {
         action == .buy ? Color(nsColor: .systemRed) : .fundPulseGreen
     }
 
+    /// 卡片背景色（复用设计系统）。
     private var cardBackground: Color {
         PanelDesign.cardBackground
     }
 
+    /// 选择器背景色（复用设计系统）。
     private var selectorBackground: Color {
         PanelDesign.selectorBackground
     }
 
+    /// 是否允许选择交易模式（仅新增基金可切换）。
     private var canChooseTradeMode: Bool {
         isEditingInitialFund
     }
 
+    /// 是否正在编辑“新增基金”类型的记录。
     private var isEditingInitialFund: Bool {
         editingRecord?.kind == .newFund
     }
 
+    /// 可选交易模式：可切换时全部，否则只允许金额。
     private var availableModes: [PositionMode] {
         canChooseTradeMode ? Array(PositionMode.allCases) : [.amount]
     }
 
+    /// 实际生效的交易模式：可切换时用所选，否则买入=金额、卖出=份额。
     private var effectiveMode: PositionMode {
         if canChooseTradeMode {
             return mode
@@ -576,40 +607,48 @@ struct FundTradeEditorView: View {
         return action == .buy ? .amount : .share
     }
 
+    /// 交易日期文本（yyyy-MM-dd）。
     private var tradeDateText: String {
         DateOnlyFormatter.string(from: tradeDate)
     }
 
+    /// 按交易日期 + 时段算出的确认净值日文本。
     private var acceptedDateText: String {
         TradingCalendar.acceptedTradeDate(positionDate: tradeDateText, timeType: tradeTimeType)
     }
 
+    /// 金额输入解析为 Double（非法或空返回 nil）。
     private var inputAmount: Double? {
         Self.number(amount)
     }
 
+    /// 份额输入解析为 Double（非法或空返回 nil）。
     private var inputShares: Double? {
         Self.number(shares)
     }
 
+    /// 买入费率解析（>=0，仅买入且金额模式有效）。
     private var inputBuyFeeRate: Double? {
         guard action == .buy, effectiveMode == .amount else { return nil }
         guard let value = Self.number(buyFeeRate), value >= 0 else { return nil }
         return value
     }
 
+    /// 卖出费用解析（>=0，仅卖出有效）。
     private var inputSellFeeValue: Double? {
         guard action == .sell else { return nil }
         guard let value = Self.number(sellFeeValue), value >= 0 else { return nil }
         return value
     }
 
+    /// 买入净额：金额 / (1 + 费率%)，即扣除费率后用于申购的净额。
     private var estimatedBuyNetAmount: Double? {
         guard let amount = inputAmount else { return nil }
         let feeRate = inputBuyFeeRate ?? 0
         return amount / (1 + feeRate / 100)
     }
 
+    /// 买入预估手续费：金额 - 净额（最低 0）。
     private var estimatedBuyFee: Double? {
         guard let amount = inputAmount,
               let netAmount = estimatedBuyNetAmount
@@ -617,6 +656,7 @@ struct FundTradeEditorView: View {
         return max(0, amount - netAmount)
     }
 
+    /// 买入预估份额：净额 / 参考净值（保留 2 位）。
     private var estimatedBuyShares: Double? {
         guard action == .buy,
               let netAmount = estimatedBuyNetAmount,
@@ -626,6 +666,7 @@ struct FundTradeEditorView: View {
         return rounded(netAmount / referenceNetValue, places: 2)
     }
 
+    /// 卖出预计回款：毛额 - 手续费。
     private var estimatedSellReturn: Double? {
         guard let grossAmount = estimatedSellGrossAmount,
               let fee = estimatedSellFee
@@ -633,6 +674,7 @@ struct FundTradeEditorView: View {
         return grossAmount - fee
     }
 
+    /// 卖出毛额：份额 × 参考净值。
     private var estimatedSellGrossAmount: Double? {
         guard action == .sell,
               let shares = inputShares,
@@ -642,6 +684,7 @@ struct FundTradeEditorView: View {
         return shares * referenceNetValue
     }
 
+    /// 卖出手续费：按费率(毛额×费率%)或按金额。
     private var estimatedSellFee: Double? {
         guard let grossAmount = estimatedSellGrossAmount,
               let feeValue = inputSellFeeValue
@@ -654,6 +697,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 仅用于展示的近似回款（无净值时用估算价测算，不写入持仓计算）。
     // Display-only approximation; keep it out of persisted trades and position math.
     private var displayOnlyApproximateSellReturn: Double? {
         guard referenceNetValue == nil,
@@ -663,6 +707,7 @@ struct FundTradeEditorView: View {
         return max(0, grossAmount - fee)
     }
 
+    /// 仅用于展示的近似卖出毛额：份额 × 估算单价（不写入持仓计算）。
     private var displayOnlyApproximateSellGrossAmount: Double? {
         guard action == .sell,
               let shares = inputShares,
@@ -672,6 +717,7 @@ struct FundTradeEditorView: View {
         return shares * price
     }
 
+    /// 仅用于展示的估算卖出单价：基于成本或市值×当日涨跌，已更新则用成本；不写入持仓计算。
     private var displayOnlyApproximateSellPrice: Double? {
         guard action == .sell,
               fund.todayRate.isFinite
@@ -696,6 +742,7 @@ struct FundTradeEditorView: View {
         return basePrice * (1 + fund.todayRate / 100)
     }
 
+    /// 仅用于展示的近似卖出手续费（按费率或金额）。
     private var displayOnlyApproximateSellFee: Double? {
         guard let grossAmount = displayOnlyApproximateSellGrossAmount,
               let feeValue = inputSellFeeValue
@@ -708,6 +755,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 卖出费用显示文本：费率模式显示“x%”，金额模式显示金额。
     private var sellFeeValueText: String {
         let value = inputSellFeeValue ?? 0
         switch sellFeeMode {
@@ -718,6 +766,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 卖出单价显示：有净值显示净值，无则显示近似价（橙色），否则“待确认”。
     @ViewBuilder
     private var sellPriceDisplayValue: some View {
         if let referenceNetValue {
@@ -730,6 +779,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 卖出手续费显示：精确值、近似值（橙色）或“待计算”。
     @ViewBuilder
     private var sellFeeDisplayValue: some View {
         if let estimatedSellFee {
@@ -742,6 +792,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 预计回款显示：精确值、近似值（橙色）或“待计算”。
     @ViewBuilder
     private var sellReturnDisplayValue: some View {
         if let estimatedSellReturn {
@@ -754,6 +805,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 交易后预览份额：买入相加、卖出相减（最低 0）。
     private var previewShares: Double? {
         let currentShares = fund.migratedShares ?? 0
         switch action {
@@ -766,16 +818,19 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 交易前持仓市值（当前份额 × 参考净值）。
     private var previewCurrentValueBefore: Double? {
         guard let referenceNetValue else { return nil }
         return (fund.migratedShares ?? 0) * referenceNetValue
     }
 
+    /// 交易后持仓市值（预览份额 × 参考净值）。
     private var previewCurrentValueAfter: Double? {
         guard let previewShares, let referenceNetValue else { return nil }
         return previewShares * referenceNetValue
     }
 
+    /// 仅用于展示的交易前市值（无净值时用估算单价）。
     private var displayOnlyApproximateCurrentValueBefore: Double? {
         guard referenceNetValue == nil,
               let price = displayOnlyApproximateSellPrice
@@ -783,6 +838,7 @@ struct FundTradeEditorView: View {
         return (fund.migratedShares ?? 0) * price
     }
 
+    /// 仅用于展示的交易后市值（无净值时用估算单价）。
     private var displayOnlyApproximateCurrentValueAfter: Double? {
         guard referenceNetValue == nil,
               let previewShares,
@@ -791,6 +847,7 @@ struct FundTradeEditorView: View {
         return previewShares * price
     }
 
+    /// 交易前市值显示：精确值、近似值（橙色）或“--”。
     @ViewBuilder
     private var previewCurrentValueBeforeDisplayValue: some View {
         if let previewCurrentValueBefore {
@@ -805,6 +862,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 交易后市值显示：精确值、近似值（橙色）或“待计算”。
     @ViewBuilder
     private var previewCurrentValueAfterDisplayValue: some View {
         if let previewCurrentValueAfter {
@@ -817,10 +875,12 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 参考净值文本（无则“待确认”）。
     private var referencePriceText: String {
         referenceNetValue.map { MoneyFormatter.plainMoney($0) } ?? "待确认"
     }
 
+    /// 参考净值脚注：说明使用哪日净值，或净值未取到时加入待确认。
     private var referenceFootnote: String {
         if let referenceNetValueDate {
             return "使用 \(referenceNetValueDate) 净值测算"
@@ -828,6 +888,7 @@ struct FundTradeEditorView: View {
         return "该日净值未取到时会加入待确认"
     }
 
+    /// 测算依据说明：基于当前参考净值，或未取到净值时确认后保持待确认。
     private var referenceBasisText: String {
         if referenceNetValue == nil {
             return "*净值未取到，确认后将保持待确认"
@@ -835,6 +896,7 @@ struct FundTradeEditorView: View {
         return "*基于当前参考净值测算"
     }
 
+    /// 卖出份额占位符：显示当前最多可卖份额。
     private var availableSharePlaceholder: String {
         if action == .sell {
             return "最多 \(numberText(fund.migratedShares ?? 0, places: 2)) 份"
@@ -842,6 +904,7 @@ struct FundTradeEditorView: View {
         return "请输入加仓份额"
     }
 
+    /// 通用卡片分区容器：标题 + 自定义内容，统一卡片背景与描边。
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -853,6 +916,7 @@ struct FundTradeEditorView: View {
         .overlay(cardBorder(cornerRadius: 10))
     }
 
+    /// 表单字段封装：上方标题 + 下方内容视图的纵向布局。
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
@@ -862,12 +926,14 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 确认行便利方法：标题 + 字符串值的右对齐展示。
     private func confirmationRow(_ title: String, _ value: String) -> some View {
         confirmationRow(title) {
             Text(value)
         }
     }
 
+    /// 确认行：标题 + 自定义值视图的右对齐展示（最多两行）。
     private func confirmationRow<Value: View>(
         _ title: String,
         @ViewBuilder value: () -> Value
@@ -885,6 +951,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 预览格便利方法：标题 + 前后字符串值（箭头连接）。
     private func previewTile(title: String, before: String, after: String) -> some View {
         previewTile(title: title) {
             Text(before)
@@ -894,6 +961,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 预览格：标题 + 前/后自定义视图（箭头连接），展示交易前后变化。
     private func previewTile<Before: View, After: View>(
         title: String,
         @ViewBuilder before: () -> Before,
@@ -921,6 +989,7 @@ struct FundTradeEditorView: View {
         .overlay(PanelDesign.border(cornerRadius: 8))
     }
 
+    /// 错误文案视图（红色，最多两行）。
     private func errorText(_ message: String) -> some View {
         Text(message)
             .font(.system(size: 11, weight: .medium))
@@ -928,6 +997,7 @@ struct FundTradeEditorView: View {
             .lineLimit(2)
     }
 
+    /// 选择器按钮：选中态高亮，点击执行切换动作。
     private func selectorButton(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -951,6 +1021,7 @@ struct FundTradeEditorView: View {
         .focusable(false)
     }
 
+    /// 单行输入框：占位符 + 文本绑定 + 后缀单位（带输入框样式）。
     private func plainTextField(_ placeholder: String, text: Binding<String>, suffix: String) -> some View {
         HStack(spacing: 8) {
             TextField(placeholder, text: text)
@@ -970,11 +1041,13 @@ struct FundTradeEditorView: View {
         )
     }
 
+    /// 卡片描边视图（分隔线色细描边）。
     private func cardBorder(cornerRadius: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .stroke(Color(nsColor: .separatorColor).opacity(0.42), lineWidth: 0.6)
     }
 
+    /// 提交：确认态则保存交易，否则进入确认页（清空错误）。
     private func submit() {
         guard canSubmit else { return }
         if isConfirming {
@@ -985,6 +1058,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 组装交易草稿并写入：编辑走 editTradeRecord，新增走 adjustFundPosition；成功后回调并关闭。
     private func save() {
         guard !isSaving else { return }
         isSaving = true
@@ -1024,25 +1098,30 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 取消参考净值任务并关闭编辑器。
     private func close() {
         referenceTask?.cancel()
         onClose?()
     }
 
+    /// 按指定位数格式化数值为字符串。
     private func numberText(_ value: Double, places: Int) -> String {
         value.formatted(.number.precision(.fractionLength(0...places)))
     }
 
+    /// 初始化回填用的数值格式化（按指定位数）。
     private static func initialNumberText(_ value: Double, places: Int) -> String {
         value.formatted(.number.precision(.fractionLength(0...places)))
     }
 
+    /// 把输入文本解析为 Double（去千分位逗号，空或非法返回 nil）。
     private static func number(_ text: String) -> Double? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         return Double(trimmed.replacingOccurrences(of: ",", with: ""))
     }
 
+    /// 切换日期/时段后异步拉取交易参考净值，回填净值与日期，并清理旧任务。
     private func scheduleReferenceNetValueLookup() {
         referenceTask?.cancel()
         let code = fund.code
@@ -1066,6 +1145,7 @@ struct FundTradeEditorView: View {
         }
     }
 
+    /// 按指定位数四舍五入（用于份额等精度控制）。
     private func rounded(_ value: Double, places: Int) -> Double {
         let scale = pow(10, Double(places))
         return (value * scale).rounded() / scale

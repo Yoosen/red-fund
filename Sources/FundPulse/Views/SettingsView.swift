@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 @preconcurrency import UserNotifications
 
+/// 设置面板（五大分区：显示 / 提醒 / 数据 / 支持 / 关于）。
+/// 负责把用户对“外观、菜单栏内容、自动刷新、操作/涨跌幅提醒、京东会话、本地数据”的修改
+/// 写回 AppSettingsStore / PortfolioStore，并通过注入的回调触发刷新、检查更新、打开外部链接等动作。
+
+/// 一个“点击不抢占焦点”的原生开关封装（用 NSSwitch 但屏蔽 firstResponder）。
 private struct FocuslessSwitch: NSViewRepresentable {
     @Binding var isOn: Bool
 
@@ -37,10 +42,12 @@ private struct FocuslessSwitch: NSViewRepresentable {
     }
 }
 
+/// NSSwitch 子类：重写 acceptsFirstResponder 为 false，避免开关抢走面板焦点。
 private final class NoFocusSwitch: NSSwitch {
     override var acceptsFirstResponder: Bool { false }
 }
 
+/// 设置面板的五个分区标识。
 enum SettingsSection: String, CaseIterable, Identifiable {
     case display
     case refreshAndReminders
@@ -66,6 +73,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
 }
 
+/// 当前选中分区的状态容器（封装选中态，便于比较/切换）。
 struct SettingsSectionSession: Equatable {
     private(set) var selectedSection: SettingsSection
 
@@ -78,6 +86,7 @@ struct SettingsSectionSession: Equatable {
     }
 }
 
+/// 设置主视图（SwiftUI）。布局：头部 → 分区切换 → 可滚动分区内容 → 底部退出按钮。
 struct SettingsView: View {
     let store: PortfolioStore
     let settingsStore: AppSettingsStore
@@ -234,6 +243,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 头部：齿轮图标 + “设置” + 版本号 + 关闭按钮。
     private var header: some View {
         PanelHeader(
             systemImage: "gearshape",
@@ -244,6 +254,7 @@ struct SettingsView: View {
         )
     }
 
+    /// 顶部分区切换器（显示/提醒/数据/支持/关于）。
     private var settingsSectionPicker: some View {
         PanelSegmentedPicker(
             values: SettingsSection.allCases,
@@ -254,6 +265,7 @@ struct SettingsView: View {
         .accessibilityLabel("设置分类")
     }
 
+    /// 根据当前分区渲染对应内容（切换分区时 ScrollView 用 .id 重置滚动位置）。
     @ViewBuilder
     private var selectedSettingsContent: some View {
         switch selectedSection {
@@ -270,6 +282,7 @@ struct SettingsView: View {
         }
     }
 
+    /// “显示”分区：外观 / 菜单栏 / 主弹窗 三个子区块。
     private var displaySettingsContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             PanelSection(title: "外观") {
@@ -289,6 +302,7 @@ struct SettingsView: View {
         }
     }
 
+    /// “提醒”分区：自动刷新 / 每日操作提醒 / 涨跌幅提醒 / 通知测试。
     private var refreshAndReminderSettingsContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             PanelSection(title: "自动刷新") {
@@ -309,6 +323,7 @@ struct SettingsView: View {
         }
     }
 
+    /// “数据”分区：实验功能 / 京东会话 / 本地数据（清空持仓）。
     private var dataSettingsContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             PanelSection(title: "实验功能") {
@@ -325,18 +340,21 @@ struct SettingsView: View {
         }
     }
 
+    /// “支持”分区：支持作者（二维码/链接）。
     private var supportSettingsContent: some View {
         PanelSection(title: "支持作者") {
             supportAuthorSection
         }
     }
 
+    /// 底部操作栏：退出 Fund Pulse（NSApp.terminate）。
     private var settingsFooter: some View {
         plainTextButton("退出 Fund Pulse", systemImage: "power", role: .destructive) {
             NSApp.terminate(nil)
         }
     }
 
+    /// “关于”分区：建议反馈 / 联系作者 / 关于与隐私。
     private var aboutSettingsContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             PanelSection(title: "建议反馈") {
@@ -353,6 +371,7 @@ struct SettingsView: View {
         }
     }
 
+    /// “每日操作提醒”子区块：总开关 + 提醒时间输入。
     private var operationReminderSettingsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 12) {
@@ -383,6 +402,7 @@ struct SettingsView: View {
         }
     }
 
+    /// “通知测试”子区块：发送一条测试系统通知并展示结果/跳转到系统通知设置。
     private var notificationTestSection: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .center, spacing: 12) {
@@ -429,6 +449,7 @@ struct SettingsView: View {
         .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// “自动刷新”子区块：开市间隔 / 休市间隔 两个滑块（间隔由交易时段决定）。
     private var autoRefreshSettingsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             autoRefreshIntervalControl(
@@ -456,6 +477,7 @@ struct SettingsView: View {
         .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// “主弹窗”子区块：是否显示大盘指数 + 默认指数选择。
     private var mainPanelSettingsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
@@ -492,6 +514,7 @@ struct SettingsView: View {
         .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// 是否正在检查/下载/安装更新（用于禁用相关按钮）。
     private var isUpdateBusy: Bool {
         switch updateStore.status {
         case .checking, .downloading, .installing:
@@ -501,6 +524,7 @@ struct SettingsView: View {
         }
     }
 
+    /// “实验功能”子区块：Beta 开关 + 开启后展示“同步京东”入口。
     private var betaFeaturesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
@@ -554,6 +578,7 @@ struct SettingsView: View {
         .animation(.easeInOut(duration: 0.16), value: settingsStore.settings.betaFeaturesEnabled)
     }
 
+    /// “本地数据”子区块：清空所有持仓（带二次确认弹窗）。
     private var clearHoldingsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 12) {
@@ -599,6 +624,7 @@ struct SettingsView: View {
         .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// “京东会话”子区块：清除本机京东网页登录状态（不动本地持仓/收益）。
     private var jdFinanceSessionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("清除这台 Mac 上的京东网页登录状态。不会删除本地持仓、交易记录或历史收益。")
@@ -632,6 +658,7 @@ struct SettingsView: View {
         .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// “关于与隐私”子区块：隐私免责声明 + 重新查看引导。
     private var aboutAndPrivacySection: some View {
         VStack(alignment: .leading, spacing: 7) {
             PanelLinkButton(
@@ -656,10 +683,12 @@ struct SettingsView: View {
         }
     }
 
+    /// “支持作者”子区块（复用 SupportAuthorSection 组件）。
     private var supportAuthorSection: some View {
         SupportAuthorSection()
     }
 
+    /// “建议反馈”子区块：报告问题 / 提出建议（打开 GitHub 模板，失败则复制链接）。
     private var feedbackSection: some View {
         VStack(alignment: .leading, spacing: 7) {
             PanelLinkButton(
@@ -690,10 +719,12 @@ struct SettingsView: View {
         }
     }
 
+    /// “联系作者”子区块：展示微信联系二维码。
     private var contactAuthorSection: some View {
         wechatContactQRCode
     }
 
+    /// 微信二维码图片（读不到资源时降级为不可用提示）。
     private var wechatContactQRCode: some View {
         Group {
             if let url = ContactAuthorResources.wechatQRCodeURL(),
@@ -714,6 +745,7 @@ struct SettingsView: View {
         .accessibilityLabel("微信联系二维码")
     }
 
+    /// 是否存在可清空的本地数据（任一基金/待确认/记录/历史非空）。
     private var canClearHoldings: Bool {
         !store.snapshot.funds.isEmpty
             || store.snapshot.pendingTrades?.isEmpty == false
@@ -723,6 +755,7 @@ struct SettingsView: View {
             || !store.performanceStore.snapshot.days.isEmpty
     }
 
+    /// 自动刷新间隔滑块控件（标题 + 当前间隔 + 滑块 + 说明）。
     private func autoRefreshIntervalControl(
         title: String,
         selectedInterval: AutoRefreshInterval,
@@ -758,6 +791,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 操作提醒开关的双向绑定：写入 settingsStore 并触发 onSettingsChanged。
     private var operationReminderEnabledBinding: Binding<Bool> {
         Binding(
             get: { settingsStore.settings.operationReminderEnabled },
@@ -768,6 +802,7 @@ struct SettingsView: View {
         )
     }
 
+    /// “涨跌幅提醒”子区块：总开关 + 涨幅/跌幅档位选择 + 当日去重说明。
     private var dailyGrowthReminderSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 12) {
@@ -812,6 +847,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 涨跌幅提醒开关的双向绑定。
     private var dailyGrowthReminderEnabledBinding: Binding<Bool> {
         Binding(
             get: { settingsStore.settings.dailyGrowthReminderEnabled },
@@ -822,6 +858,7 @@ struct SettingsView: View {
         )
     }
 
+    /// 涨/跌幅档位选择器（多个可选档位，按涨跌着色）。
     private func growthTierPicker(
         title: String,
         systemImage: String,
@@ -851,6 +888,7 @@ struct SettingsView: View {
         .opacity(settingsStore.settings.dailyGrowthReminderEnabled ? 1 : 0.58)
     }
 
+    /// 单个档位按钮（选中态着色，未开启提醒时禁用）。
     private func growthTierButton(
         _ tier: FundGrowthReminderTier,
         isSelected: Bool,
@@ -881,6 +919,7 @@ struct SettingsView: View {
         .disabled(!settingsStore.settings.dailyGrowthReminderEnabled)
     }
 
+    /// 切换某个涨/跌幅档位的选中状态并写回 settingsStore。
     private func toggleDailyGrowthTier(_ tier: FundGrowthReminderTier, isRise: Bool) {
         let current = isRise
             ? settingsStore.settings.dailyGrowthRiseTiers
@@ -900,6 +939,7 @@ struct SettingsView: View {
         onSettingsChanged?()
     }
 
+    /// 实验功能开关的双向绑定。
     private var betaFeaturesEnabledBinding: Binding<Bool> {
         Binding(
             get: { settingsStore.settings.betaFeaturesEnabled },
@@ -910,6 +950,7 @@ struct SettingsView: View {
         )
     }
 
+    /// 开市刷新间隔滑块绑定：滑块索引 ↔ AutoRefreshInterval 互转并写回。
     private var autoRefreshIntervalSliderBinding: Binding<Double> {
         Binding(
             get: {
@@ -930,6 +971,7 @@ struct SettingsView: View {
         )
     }
 
+    /// 休市刷新间隔滑块绑定。
     private var marketClosedAutoRefreshIntervalSliderBinding: Binding<Double> {
         Binding(
             get: {
@@ -952,6 +994,7 @@ struct SettingsView: View {
         )
     }
 
+    /// “显示大盘指数”开关的双向绑定。
     private var marketIndexesShownBinding: Binding<Bool> {
         Binding(
             get: { settingsStore.settings.showsMarketIndexes },
@@ -962,6 +1005,7 @@ struct SettingsView: View {
         )
     }
 
+    /// 默认指数下拉菜单（上证/深证/创业板等）。
     private var defaultMarketIndexPicker: some View {
         Menu {
             ForEach(MarketIndexID.allCases) { indexID in
@@ -997,6 +1041,7 @@ struct SettingsView: View {
         .fixedSize()
     }
 
+    /// 提醒时间输入按钮：点击弹出一个原生时间选择面板（时/分两列滚轮）。
     private var operationReminderTimeInput: some View {
         Button {
             syncOperationReminderTimeDraft()
@@ -1027,6 +1072,7 @@ struct SettingsView: View {
             }
     }
 
+    /// “菜单栏 - 显示内容”行：金额 / 涨跌幅 / 两者 / 隐藏 的选择。
     private var menuBarContentModeRow: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("显示内容")
@@ -1047,6 +1093,7 @@ struct SettingsView: View {
         .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// 菜单栏内容模式分段选择器（选中项用 matchedGeometryEffect 做滑动高亮动画）。
     private var menuBarContentModePicker: some View {
         HStack(spacing: 4) {
             ForEach(MenuBarContentMode.allCases) { mode in
@@ -1098,6 +1145,7 @@ struct SettingsView: View {
         .animation(.spring(response: 0.22, dampingFraction: 0.86), value: displayedMenuBarContentMode)
     }
 
+    /// “菜单栏 - 涨跌颜色”行：颜色 / 符号 的选择。
     private var menuBarDisplayModeRow: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("涨跌颜色")
@@ -1118,6 +1166,7 @@ struct SettingsView: View {
         .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// 菜单栏涨跌颜色分段选择器（红涨绿跌 vs ±符号）。
     private var menuBarDisplayModePicker: some View {
         HStack(spacing: 4) {
             ForEach(MenuBarDisplayMode.allCases) { mode in
@@ -1169,6 +1218,7 @@ struct SettingsView: View {
         .animation(.spring(response: 0.22, dampingFraction: 0.86), value: displayedMenuBarDisplayMode)
     }
 
+    /// 外观模式分段选择器：跟随系统 / 浅色 / 深色。
     private var appearanceModePicker: some View {
         HStack(spacing: 4) {
             ForEach(AppAppearanceMode.allCases) { mode in
@@ -1220,6 +1270,7 @@ struct SettingsView: View {
         .animation(.spring(response: 0.22, dampingFraction: 0.86), value: displayedAppearanceMode)
     }
 
+    /// 选择外观模式：先播放动画，延迟写回 settingsStore（避免动画期间配置抖动）。
     private func selectAppearanceMode(_ mode: AppAppearanceMode) {
         guard mode != displayedAppearanceMode else { return }
         withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
@@ -1234,6 +1285,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 选择菜单栏内容模式并写回 settingsStore。
     private func selectMenuBarContentMode(_ mode: MenuBarContentMode) {
         guard mode != displayedMenuBarContentMode else { return }
         withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
@@ -1243,6 +1295,7 @@ struct SettingsView: View {
         onSettingsChanged?()
     }
 
+    /// 选择菜单栏涨跌颜色模式并写回 settingsStore。
     private func selectMenuBarDisplayMode(_ mode: MenuBarDisplayMode) {
         guard mode != displayedMenuBarDisplayMode else { return }
         withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
@@ -1252,6 +1305,7 @@ struct SettingsView: View {
         onSettingsChanged?()
     }
 
+    /// 菜单栏内容模式的图标名。
     private func menuBarContentModeSystemImage(_ mode: MenuBarContentMode) -> String {
         switch mode {
         case .amount:
@@ -1265,6 +1319,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 菜单栏颜色模式的图标名。
     private func menuBarDisplayModeSystemImage(_ mode: MenuBarDisplayMode) -> String {
         switch mode {
         case .color:
@@ -1274,6 +1329,7 @@ struct SettingsView: View {
         }
     }
 
+    /// “测试”按钮：触发一次通知权限检测。
     private var testReminderButton: some View {
         Button {
             testReminderPermission()
@@ -1289,6 +1345,7 @@ struct SettingsView: View {
         .disabled(isTestingReminder)
     }
 
+    /// 把提醒时间草稿设为当前系统时间。
     private func setOperationReminderDraftToCurrentTime() {
         let components = Calendar.current.dateComponents([.hour, .minute], from: Date())
         operationReminderDraftHour = components.hour ?? 0
@@ -1299,12 +1356,14 @@ struct SettingsView: View {
         )
     }
 
+    /// 打开时间面板前，把草稿（时/分）同步为已保存的提醒时间。
     private func syncOperationReminderTimeDraft() {
         syncOperationReminderTimeText()
         operationReminderDraftHour = settingsStore.settings.operationReminderTimeMinutes / 60
         operationReminderDraftMinute = settingsStore.settings.operationReminderTimeMinutes % 60
     }
 
+    /// 确认时间面板：解析文本写入 settingsStore（有变化才触发 onSettingsChanged）。
     private func commitOperationReminderTimeText() {
         guard let minutes = parsedReminderTimeMinutes(operationReminderTimeText) else {
             syncOperationReminderTimeText()
@@ -1322,10 +1381,12 @@ struct SettingsView: View {
         isOperationReminderTimeSelectorPresented = false
     }
 
+    /// 把已保存的提醒时间文本同步到输入框草稿。
     private func syncOperationReminderTimeText() {
         operationReminderTimeText = settingsStore.settings.operationReminderTimeText
     }
 
+    /// 异步检测通知权限：请求授权（如未决定）→ 发送测试通知 → 回主线程更新结果文案。
     private func testReminderPermission() {
         guard !isTestingReminder else { return }
         isTestingReminder = true
@@ -1342,6 +1403,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 真正发送测试通知：处理“未决定/已拒绝/已授权”等权限状态，构造并投递本地通知。
     private func sendTestReminderNotification() async -> (message: String, canOpenNotificationSettings: Bool) {
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
@@ -1388,6 +1450,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 打开 macOS 系统“通知”设置面板。
     private func openNotificationSettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") else {
             return
@@ -1395,6 +1458,7 @@ struct SettingsView: View {
         NSWorkspace.shared.open(url)
     }
 
+    /// 更新状态行：根据 updateStore.status 展示 检查中/可用/下载中/已下载/安装中/最新/失败。
     @ViewBuilder
     private var updateStatusRow: some View {
         switch updateStore.status {
@@ -1488,6 +1552,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 通用信息行（标题左 + 等宽值右）。
     private func infoRow(_ title: String, _ value: String) -> some View {
         HStack {
             Text(title)
@@ -1499,6 +1564,7 @@ struct SettingsView: View {
         .font(.system(size: 11, weight: .medium))
     }
 
+    /// 数据源信息行（固定宽度标题 + 等宽值）。
     private func dataSourceRow(_ title: String, _ value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
@@ -1514,6 +1580,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 状态文本卡片（次要色）。
     private func statusText(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 11))
@@ -1524,6 +1591,7 @@ struct SettingsView: View {
             .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// 通用纯文本按钮（用于底部“退出”等）。
     private func plainTextButton(
         _ title: String,
         systemImage: String,
@@ -1541,12 +1609,14 @@ struct SettingsView: View {
         .focusable(false)
     }
 
+    /// 触发检查更新（异步调用注入的 onCheckUpdate）。
     private func checkUpdate() {
         Task {
             await onCheckUpdate?()
         }
     }
 
+    /// 打开外部链接：优先用 onOpenExternalURL，失败则把链接复制到剪贴板。
     private func openExternalLink(
         _ url: URL,
         fallbackText: String,
@@ -1568,6 +1638,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 外部链接操作后的状态提示（如“已复制链接”）。
     @ViewBuilder
     private func externalLinkStatusMessage(_ message: String?) -> some View {
         if let message {
@@ -1579,11 +1650,13 @@ struct SettingsView: View {
         }
     }
 
+    /// 把文本写入系统剪贴板（外部链接打开失败时的兜底）。
     private func copyToPasteboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }
 
+    /// 清空所有本地持仓数据，并触发刷新与设置变更回调。
     private func clearAllHoldings() {
         do {
             try store.clearAllHoldings()
@@ -1597,6 +1670,7 @@ struct SettingsView: View {
         }
     }
 
+    /// 清除本机京东网页登录会话（异步，仅清会话不清本地数据）。
     private func clearJDFinanceSession() {
         guard !isClearingJDFinanceSession else { return }
         isClearingJDFinanceSession = true
@@ -1609,6 +1683,7 @@ struct SettingsView: View {
     }
 }
 
+/// 操作提醒时间选择弹层：文本框（HH:mm）+ 时/分两列滚轮 + 此刻/确定 按钮。
 private struct OperationReminderTimeSelectorPanel: View {
     @Binding var text: String
     @Binding var hour: Int
@@ -1713,6 +1788,7 @@ private struct OperationReminderTimeSelectorPanel: View {
         }
     }
 
+    /// 单列滚轮容器：底层是原生 SnappingTimeColumn，叠加一个高亮选中条。
     private func timeColumn(values: [Int], selection: Binding<Int>) -> some View {
         ZStack {
             SnappingTimeColumn(values: values, selection: selection)
@@ -1724,10 +1800,12 @@ private struct OperationReminderTimeSelectorPanel: View {
         }
     }
 
+    /// 把 时/分 草稿合成回 "HH:mm" 文本。
     private func syncTextFromDraft() {
         text = reminderTimeText(hour: hour, minute: minute)
     }
 
+    /// 把文本解析为 时/分 草稿（仅当文本是合法时间时）。
     private func syncDraftFromText() {
         guard let minutes = parsedReminderTimeMinutes(text) else { return }
         hour = minutes / 60
@@ -1736,6 +1814,7 @@ private struct OperationReminderTimeSelectorPanel: View {
     }
 }
 
+/// 把时间输入归一化：全角冒号转半角、只保留数字与冒号、限制长度。
 private func normalizedTimeInput(_ value: String) -> String {
     let normalized = value
         .replacingOccurrences(of: "：", with: ":")
@@ -1743,10 +1822,12 @@ private func normalizedTimeInput(_ value: String) -> String {
     return String(normalized.prefix(normalized.contains(":") ? 5 : 4))
 }
 
+/// 把 时/分 格式化为 "HH:mm" 文本。
 private func reminderTimeText(hour: Int, minute: Int) -> String {
     String(format: "%02d:%02d", hour, minute)
 }
 
+/// 解析时间文本为“自当日 0 点起的分钟数”（支持 "HH:mm" 或纯数字 "Hmm"/"HHmm"）。
 private func parsedReminderTimeMinutes(_ value: String) -> Int? {
     let text = value
         .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1784,6 +1865,8 @@ private func parsedReminderTimeMinutes(_ value: String) -> Int? {
     return hour * 60 + minute
 }
 
+/// 原生“吸附式”时间滚轮列（NSViewRepresentable）。
+/// 用 NSScrollView 竖向排列按钮，滚动停止时吸附到最近的整行，并把选中值回写到 Binding。
 private struct SnappingTimeColumn: NSViewRepresentable {
     let values: [Int]
     @Binding var selection: Int
@@ -2005,6 +2088,7 @@ private struct SnappingTimeColumn: NSViewRepresentable {
     }
 }
 
+/// 重写 NSScrollView：每次滚轮滚动都向 Coordinator 请求“滚动停止后吸附到最近行”。
 @MainActor
 private final class SnappingTimeColumnScrollView: NSScrollView {
     weak var coordinator: SnappingTimeColumn.Coordinator?
@@ -2015,6 +2099,7 @@ private final class SnappingTimeColumnScrollView: NSScrollView {
     }
 }
 
+/// 翻转坐标的文档视图（isFlipped=true），让按钮的 y 方向与 SwiftUI/文本一致。
 @MainActor
 private final class FlippedDocumentView: NSView {
     override var isFlipped: Bool { true }

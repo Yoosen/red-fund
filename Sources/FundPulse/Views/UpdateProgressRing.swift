@@ -6,6 +6,7 @@ struct UpdateProgressRing: View {
     var lineWidth: CGFloat = 3.2
     var showsGlyph = true
 
+    /// 把进度值限制在 0～1 区间，避免圆环被绘制超出范围。
     private var clampedProgress: Double {
         min(max(progress, 0), 1)
     }

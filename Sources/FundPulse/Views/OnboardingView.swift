@@ -1,5 +1,13 @@
 import SwiftUI
 
+/// 首次启动引导视图。
+/// 用一个三段式向导帮助用户完成初始化：第 1 步介绍功能、第 2 步说明隐私与数据归属、
+/// 第 3 步选择如何开始（录入真实持仓 / 导入备份 / 体验离线示例）。
+/// 所有实际动作都通过初始化时注入的回调向上层（StatusBarController）传递。
+
+/// 引导步骤的状态容器。
+/// 把“当前步骤”封装起来并提供 前进/后退/跳转 的受限操作，
+/// `clamped` 保证步骤始终落在 0...2 之间，避免越界。
 struct OnboardingStepState: Equatable {
     private(set) var step: Int
 
@@ -24,6 +32,8 @@ struct OnboardingStepState: Equatable {
     }
 }
 
+/// 首次启动引导主视图（SwiftUI）。
+/// 布局自上而下：通用头部 PanelHeader → 进度条 → 当前步骤内容 → 底部操作栏。
 struct OnboardingView: View {
     let onAddFund: () -> Void
     let onImportPortfolio: () -> Void
@@ -86,10 +96,12 @@ struct OnboardingView: View {
         .background(PanelDesign.panelBackground)
     }
 
+    /// 当前步骤索引（转发到 stepState）。
     private var step: Int {
         stepState.step
     }
 
+    /// 顶部三段进度条：已到达/已超越的步骤用主题色填充，可点击直接跳转到对应步骤。
     private var progress: some View {
         HStack(spacing: 6) {
             ForEach(0 ..< 3, id: \.self) { index in
@@ -112,6 +124,7 @@ struct OnboardingView: View {
         .accessibilityLabel("引导进度，第 \(step + 1) 步，共 3 步")
     }
 
+    /// 第 1 步：功能介绍（持仓收益、每日盈亏、自定义提醒）。
     private var welcomeStep: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
@@ -131,6 +144,8 @@ struct OnboardingView: View {
         }
     }
 
+    /// 第 2 步：隐私与数据归属说明（本地存储、行情查询会上传基金代码、估值仅供参考）。
+    /// 仅作说明，不要求勾选同意；可跳转到完整隐私/免责声明。
     private var privacyStep: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
@@ -173,6 +188,7 @@ struct OnboardingView: View {
         }
     }
 
+    /// 第 3 步：选择如何开始——添加真实基金、导入备份、或体验完全离线的示例数据。
     private var dataStep: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
@@ -208,6 +224,8 @@ struct OnboardingView: View {
         }
     }
 
+    /// 底部操作栏：非首步显示“上一步”；非末步显示“继续”；
+    /// 末步显示“暂不添加，空白开始”。当前步骤随 step 变化。
     private var footer: some View {
         HStack(spacing: 10) {
             if step > 0 {
@@ -237,6 +255,7 @@ struct OnboardingView: View {
         .frame(height: 30)
     }
 
+    /// 功能亮点行（图标 + 标题 + 描述），用于第 1 步。
     private func featureRow(icon: String, title: String, detail: String) -> some View {
         HStack(spacing: 11) {
             Image(systemName: icon)
@@ -258,6 +277,7 @@ struct OnboardingView: View {
         .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
+    /// 隐私说明行（左侧小图标 + 右侧说明文字）。
     private func noticeRow(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon)
@@ -270,6 +290,7 @@ struct OnboardingView: View {
         }
     }
 
+    /// 第 3 步的“开始方式”大按钮（图标 + 标题 + 详情 + 可选徽章 + 右侧箭头）。
     private func onboardingAction(
         icon: String,
         title: String,

@@ -4,10 +4,12 @@ import SwiftUI
 struct SupportAuthorSection: View {
     @State private var selectedAsset: SupportAuthorAsset
 
+    /// 初始化时设定默认选中的收款方式（微信或支付宝）。
     init(initialAsset: SupportAuthorAsset = .wechat) {
         _selectedAsset = State(initialValue: initialAsset)
     }
 
+    /// 渲染“支持作者”区块：引导文案 + 支付方式选择器 + 收款码 + 说明文字。
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(SupportAuthorCopy.motivation)
@@ -38,9 +40,11 @@ struct SupportAuthorSection: View {
 
 }
 
+/// 内部视图：根据资源加载对应支付方式的收款码图片，加载失败则显示不可用占位。
 private struct SupportQRCodeImage: View {
     let asset: SupportAuthorAsset
 
+    /// 加载并展示选中支付方式的收款码图片，或“收款码不可用”提示。
     var body: some View {
         Group {
             if let url = SupportAuthorResources.url(for: asset),
@@ -62,6 +66,7 @@ private struct SupportQRCodeImage: View {
 }
 
 private extension SupportAuthorAsset {
+    /// 各支付方式的主题色（微信绿 / 支付宝蓝）。
     var tint: Color {
         switch self {
         case .wechat:
@@ -73,6 +78,7 @@ private extension SupportAuthorAsset {
 
 }
 
+#if canImport(PreviewsMacros)
 #Preview("支持作者 - 微信") {
     SupportAuthorSection()
         .frame(width: 312)
@@ -84,3 +90,4 @@ private extension SupportAuthorAsset {
         .frame(width: 312)
         .padding()
 }
+#endif

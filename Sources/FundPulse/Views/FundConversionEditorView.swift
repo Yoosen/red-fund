@@ -1,6 +1,11 @@
 import SwiftUI
 
+/// 基金转换编辑器（新增 / 编辑一笔“转出某基金并转入目标基金”的操作）。
+/// 用户选择目标基金、填写份额与费用、选择交易日期/时段，提交前先进入“确认”页预览
+/// 转换测算（转出金额、费用、预估转入份额）。支持从已有持仓中选择目标，也支持新增基金。
+/// 视图自身只负责收集输入与本地计算，真正的落库由 PortfolioStore 完成。
 struct FundConversionEditorView: View {
+    /// 滚动坐标系名称，用于通过 GeometryReader/PreferenceKey 追踪滚动偏移。
     private static let scrollCoordinateSpaceName = "fundConversionEditorScroll"
 
     let store: PortfolioStore
@@ -85,6 +90,9 @@ struct FundConversionEditorView: View {
         _buyFeeRate = State(initialValue: editingRecord?.buyFeeRate.map { Self.initialNumberText($0, places: 2) } ?? "0")
     }
 
+    /// 视图主体：头部 + 可滚动内容区 + 底部操作栏；统一尺寸与面板背景。
+    /// onAppear 时解析已有目标、预取目标基金元数据与参考净值；
+    /// 多处 onChange 负责在输入变化时刷新测算与候选列表。
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -138,6 +146,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 头部：转换图标 + 标题/副标题（随“编辑/确认”状态变化）+ 关闭按钮。
     private var header: some View {
         HStack(spacing: 8) {
             Image(systemName: "arrow.left.arrow.right")
@@ -183,6 +192,8 @@ struct FundConversionEditorView: View {
         .frame(height: 50)
     }
 
+    /// 中间可滚动内容区：根据 isConfirming 在“表单”与“确认预览”间切换，
+    /// 并叠加一个自定义的滚动条（conversionEditorScrollIndicator）。
     private var content: some View {
         GeometryReader { proxy in
             ZStack(alignment: .trailing) {
@@ -239,6 +250,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 自定义滚动条：根据内容高度/视口高度/偏移量计算滑块位置与尺寸（隐藏系统滚动条）。
     @ViewBuilder
     private var conversionEditorScrollIndicator: some View {
         if scrollViewportHeight > 0 {
@@ -263,6 +275,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 编辑表单：转出基金 / 转入基金 / 份额 / 费用 / 交易确认 五个区块。
     private var formContent: some View {
         VStack(spacing: 10) {
             sourceSection
@@ -276,6 +289,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 确认预览：状态横幅 + 转换效果对比 + 交易信息汇总。
     private var confirmationContent: some View {
         VStack(spacing: 10) {
             conversionStatusBanner
@@ -287,6 +301,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 转出基金区块：只读展示源基金名称、代码与当前可用份额。
     private var sourceSection: some View {
         section("转出基金") {
             HStack {
@@ -310,6 +325,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 转入基金区块：基金代码/名称组合输入、匹配状态、必要时可填写基金名称。
     private var targetSection: some View {
         section("转入基金") {
             field("基金代码 / 名称") {
@@ -325,6 +341,7 @@ struct FundConversionEditorView: View {
         .zIndex(isTargetSuggestionPresented ? 20 : 0)
     }
 
+    /// 目标匹配状态提示：查询中 / 已匹配现有持仓 / 未匹配（将新增基金）。
     @ViewBuilder
     private var targetMatchStatus: some View {
         if isLookingUpTarget {
@@ -350,6 +367,7 @@ struct FundConversionEditorView: View {
             .padding(.horizontal, 2)
     }
 
+    /// 目标基金组合输入：文本框 + 清空按钮 + 下拉候选按钮，背后挂一个原生弹层桥。
     private var targetComboInput: some View {
         HStack(spacing: 6) {
             TextField("输入基金代码/名称，或从右侧选择", text: $targetSearchText)
@@ -399,6 +417,7 @@ struct FundConversionEditorView: View {
         .background(targetSuggestionPanelBridge)
     }
 
+    /// 把“候选持仓弹层”桥接到 SwiftUI（见文件末尾的 TargetSuggestionPanelBridge）。
     private var targetSuggestionPanelBridge: some View {
         TargetSuggestionPanelBridge(
             isPresented: targetSuggestionPanelBinding,
@@ -408,6 +427,7 @@ struct FundConversionEditorView: View {
         )
     }
 
+    /// 弹层显隐绑定：仅在“已展开 且 有候选基金”时为真。
     private var targetSuggestionPanelBinding: Binding<Bool> {
         Binding(
             get: { isTargetSuggestionPresented && !targetSuggestionFunds.isEmpty },
@@ -415,6 +435,7 @@ struct FundConversionEditorView: View {
         )
     }
 
+    /// 转出份额区块：份额输入 + 1/4、1/3、1/2、全部 快速填充按钮。
     private var sharesSection: some View {
         section("转出份额") {
             field("份额") {
@@ -429,6 +450,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 费用区块：转出费率/费用（按费率或按金额切换）+ 转入费率。
     private var feeSection: some View {
         section("费用") {
             VStack(alignment: .leading, spacing: 5) {
@@ -451,6 +473,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 费用模式切换器（费率 % / 固定金额），选中态以橙色胶囊高亮。
     private var feeModeSelector: some View {
         HStack(spacing: 2) {
             ForEach(TradeFeeMode.allCases) { mode in
@@ -481,6 +504,7 @@ struct FundConversionEditorView: View {
         )
     }
 
+    /// 交易确认区块：交易日期、交易时段（时段类型胶囊）、确认净值日提示。
     private var tradeConfirmSection: some View {
         section("交易确认") {
             HStack(spacing: 10) {
@@ -516,6 +540,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 确认页的“交易信息”汇总表（逐行展示转换关键参数）。
     private var confirmationSummarySection: some View {
         section("交易信息") {
             VStack(spacing: 9) {
@@ -532,6 +557,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 确认页状态横幅：净值已确认（蓝）/ 未确认（橙）的提示文案。
     private var conversionStatusBanner: some View {
         HStack(spacing: 8) {
             Image(systemName: conversionProjection?.isFullyConfirmed == true ? "checkmark.seal.fill" : "clock.badge.exclamationmark.fill")
@@ -548,6 +574,7 @@ struct FundConversionEditorView: View {
         .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
+    /// 确认页“转换效果”：左右两张卡片对比转出与转入的金额/份额测算。
     private var conversionFlowSection: some View {
         section("转换效果") {
             HStack(spacing: 8) {
@@ -575,6 +602,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 转出侧指标：份额、净值（确认/估算）、转出金额、转出费用。
     private var outgoingMetrics: [ConversionFlowMetric] {
         let projection = conversionProjection
         return [
@@ -585,6 +613,7 @@ struct FundConversionEditorView: View {
         ]
     }
 
+    /// 转入侧指标：预估份额、净值、预估转入金额、转入费用。
     private var incomingMetrics: [ConversionFlowMetric] {
         let projection = conversionProjection
         return [
@@ -595,6 +624,7 @@ struct FundConversionEditorView: View {
         ]
     }
 
+    /// 转出/转入对比卡片（标题、基金名、代码、一组指标）。
     private func conversionFlowCard(
         title: String,
         fundName: String,
@@ -646,6 +676,7 @@ struct FundConversionEditorView: View {
         )
     }
 
+    /// 底部操作栏：取消/返回 + 主操作（确认转换 / 保存）。
     private var footer: some View {
         HStack(spacing: 8) {
             Button {
@@ -693,6 +724,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 提交校验：目标代码非空、不等于源基金、份额>0 且不超可用份额、费用输入合法。
     private var canSubmit: Bool {
         !targetCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && targetCode.trimmingCharacters(in: .whitespacesAndNewlines) != sourceFund.code
@@ -702,32 +734,39 @@ struct FundConversionEditorView: View {
             && inputBuyFeeRate != nil
     }
 
+    /// 把份额文本解析为 Double（nil 表示非法）。
     private var inputShares: Double? {
         Self.number(shares)
     }
 
+    /// 转出费用输入（必须为非负数字）。
     private var inputSellFeeValue: Double? {
         guard let value = Self.number(sellFeeValue), value >= 0 else { return nil }
         return value
     }
 
+    /// 转入费率输入（必须为非负数字，单位 %）。
     private var inputBuyFeeRate: Double? {
         guard let value = Self.number(buyFeeRate), value >= 0 else { return nil }
         return value
     }
 
+    /// 交易日期文本（yyyy-MM-dd）。
     private var tradeDateText: String {
         DateOnlyFormatter.string(from: tradeDate)
     }
 
+    /// 由交易日+时段推导出的“确认净值日”（见 TradingCalendar）。
     private var acceptedDateText: String {
         TradingCalendar.acceptedTradeDate(positionDate: tradeDateText, timeType: tradeTimeType)
     }
 
+    /// 净值确认后真正生效的下一个交易日。
     private var executionDateText: String {
         TradingCalendar.nextFundTradingDate(after: acceptedDateText) ?? acceptedDateText
     }
 
+    /// 可作为转入目标的基金：排除源基金与已清仓的零持仓，按名称排序。
     private var availableTargetFunds: [FundPosition] {
         let records = store.snapshot.tradeRecords ?? []
         return store.snapshot.funds
@@ -738,6 +777,7 @@ struct FundConversionEditorView: View {
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
+    /// 按搜索文本（代码/名称/组合标题）过滤 availableTargetFunds。
     private var matchingTargetFunds: [FundPosition] {
         let trimmedQuery = targetSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuery.isEmpty else {
@@ -751,10 +791,12 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 候选列表：搜索文本为空时展示全部，否则展示匹配结果。
     private var targetSuggestionFunds: [FundPosition] {
         showsAllTargetSuggestions ? availableTargetFunds : matchingTargetFunds
     }
 
+    /// 若 targetCode 能对应到现有持仓，则返回该基金（用于匹配状态与金额测算）。
     private var selectedExistingTargetFund: FundPosition? {
         let trimmedCode = targetCode.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedCode.isEmpty else { return nil }
@@ -763,10 +805,12 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 未匹配到现有持仓（即新增基金）时，额外显示“基金名称”输入框。
     private var shouldShowTargetNameField: Bool {
         shouldShowNewTargetStatus
     }
 
+    /// 判断当前 6 位数字代码是否表示一个“待新增”的未知基金。
     private var shouldShowNewTargetStatus: Bool {
         let trimmedCode = targetCode.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedCode.isEmpty,
@@ -776,6 +820,7 @@ struct FundConversionEditorView: View {
         return trimmedCode.count == 6 && trimmedCode.allSatisfy(\.isNumber)
     }
 
+    /// 目标基金展示名：优先用填写的名称，否则回退到代码。
     private var targetDisplayName: String {
         let trimmedName = targetName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedName.isEmpty {
@@ -784,6 +829,7 @@ struct FundConversionEditorView: View {
         return FundCodeFormatter.display(targetCode)
     }
 
+    /// 组装确认页所需的交易信息汇总（FundConversionConfirmationSummary）。
     private var confirmationSummary: FundConversionConfirmationSummary {
         FundConversionConfirmationSummary.make(
             sourceFund: sourceFund,
@@ -798,6 +844,7 @@ struct FundConversionEditorView: View {
         )
     }
 
+    /// 实时计算转换金额测算（依赖行情/参考净值/费用参数）。
     private var conversionProjection: FundConversionAmountProjection? {
         FundConversionAmountProjection.make(
             sourceFund: sourceFund,
@@ -816,6 +863,7 @@ struct FundConversionEditorView: View {
         )
     }
 
+    /// 确认页状态文案：提示是“已确认”还是“盘中估算参考”。
     private var conversionStateText: String {
         guard let projection = conversionProjection else {
             return "输入转入基金和份额后显示转换测算"
@@ -826,22 +874,26 @@ struct FundConversionEditorView: View {
         return "净值未确认，橙色金额仅按盘中估算参考"
     }
 
+    /// 净值文本：未确认时前缀“≈”。
     private func priceText(_ price: FundConversionPriceProjection?) -> String {
         guard let price else { return "待确认" }
         let prefix = price.isConfirmed ? "" : "≈ "
         return "\(prefix)\(numberText(price.value, places: 4))"
     }
 
+    /// 金额文本：未确认时前缀“≈”，nil 显示“待计算”。
     private func amountText(_ value: Double?, isConfirmed: Bool) -> String {
         guard let value else { return "待计算" }
         let prefix = isConfirmed ? "" : "≈ "
         return "\(prefix)\(MoneyFormatter.plainMoney(value))"
     }
 
+    /// 候选下拉项展示标题（名称 + 代码）。
     private func targetOptionTitle(for fund: FundPosition) -> String {
         "\(fund.name) \(FundCodeFormatter.display(fund.code))"
     }
 
+    /// 主操作按钮逻辑：未达提交条件忽略；首次点击进入确认页；确认页再次点击执行保存。
     private func submit() {
         switch FundConversionEditorPresentation.primaryAction(
             canSubmit: canSubmit,
@@ -859,6 +911,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 从候选列表选中一个现有持仓作为目标基金，回填代码/名称并收起弹层。
     private func selectExistingTargetFund(_ fund: FundPosition) {
         isSelectingTargetSuggestion = true
         targetCode = fund.code
@@ -870,6 +923,7 @@ struct FundConversionEditorView: View {
         showsAllTargetSuggestions = false
     }
 
+    /// 清空目标基金选择（代码/名称/候选状态全部复位）。
     private func clearTargetSelection() {
         targetSearchText = ""
         targetCode = ""
@@ -878,6 +932,7 @@ struct FundConversionEditorView: View {
         targetQuote = nil
     }
 
+    /// 搜索文本变化时的解析：精确匹配现有持仓则回填；6 位数字则当作新代码；否则清空代码。
     private func handleTargetSearchTextChange(_ value: String) {
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedValue.isEmpty {
@@ -909,6 +964,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 若目标匹配到现有持仓且名称未手动修改，则自动同步其名称。
     private func resolveExistingTargetIfNeeded() {
         guard let selectedExistingTargetFund else { return }
         let trimmedName = targetName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -918,6 +974,8 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 目标代码变化时，异步查询目标基金行情与名称（已有持仓直接复用，未知代码走网络查询）。
+    /// 用 lookupTask 做去重/取消，回到主线程前校验代码未被用户改掉。
     private func scheduleTargetMetadataLookup(for rawCode: String) {
         lookupTask?.cancel()
         let trimmedCode = rawCode.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -965,6 +1023,8 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 交易日/时段/目标变化时，并发拉取源基金与目标基金的行情与“交易参考净值”，
+    /// 用于计算确认/估算净值。回主线程前校验参数未变，避免竞态覆盖。
     private func scheduleReferenceValueLookup() {
         referenceTask?.cancel()
         let sourceCode = sourceFund.code
@@ -1021,6 +1081,8 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 落库：把表单组装成 FundConversionDraft，调用 PortfolioStore 新增或编辑转换；
+    /// 成功后触发 onSaved 并关闭面板，失败则在界面上显示错误。
     private func save() {
         guard let inputShares, let inputSellFeeValue, let inputBuyFeeRate else { return }
         isSaving = true
@@ -1057,6 +1119,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 份额快捷按钮（1/4、1/3、1/2、全部）：按源基金可用份额的比例填充。
     private func quickShareButton(_ title: String, fraction: Double) -> some View {
         Button {
             shares = numberText((sourceFund.migratedShares ?? 0) * fraction, places: 2)
@@ -1073,6 +1136,7 @@ struct FundConversionEditorView: View {
         .focusable(false)
     }
 
+    /// 通用胶囊选择器按钮（选中态以橙色高亮）。
     private func selectorButton(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -1086,6 +1150,7 @@ struct FundConversionEditorView: View {
         .focusable(false)
     }
 
+    /// 通用“区块”容器（标题 + 圆角卡片背景），用于各设置分组。
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -1097,6 +1162,7 @@ struct FundConversionEditorView: View {
         .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
+    /// 区块内的小字段行（左侧标题 + 右侧内容）。
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
@@ -1106,6 +1172,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 通用单行输入（含可选的右侧单位后缀，如“份”“%”“元”）。
     private func plainTextField(_ placeholder: String, text: Binding<String>, suffix: String? = nil) -> some View {
         HStack(spacing: 6) {
             TextField(placeholder, text: text)
@@ -1123,6 +1190,7 @@ struct FundConversionEditorView: View {
         .overlay(PanelDesign.border(cornerRadius: 8))
     }
 
+    /// 确认页汇总表里的一行（标题 + 右对齐值）。
     private func confirmationRow(_ title: String, _ value: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
@@ -1137,6 +1205,7 @@ struct FundConversionEditorView: View {
         }
     }
 
+    /// 错误提示文本（红色）。
     private func errorText(_ message: String) -> some View {
         Text(message)
             .font(.system(size: 11, weight: .medium))
@@ -1145,10 +1214,12 @@ struct FundConversionEditorView: View {
             .lineLimit(2)
     }
 
+    /// 把 Double 格式化为固定小数位的文本（委托 FundConversionFormatter）。
     private func numberText(_ value: Double, places: Int) -> String {
         FundConversionFormatter.numberText(value, places: places)
     }
 
+    /// 把用户输入文本（去千分位逗号）解析为 Double，失败返回 nil。
     private static func number(_ text: String) -> Double? {
         let normalized = text
             .replacingOccurrences(of: ",", with: "")
@@ -1156,17 +1227,20 @@ struct FundConversionEditorView: View {
         return Double(normalized)
     }
 
+    /// 初始化用的数字文本（允许 0...places 位小数，用于回填编辑草稿）。
     private static func initialNumberText(_ value: Double, places: Int) -> String {
         FundConversionFormatter.initialNumberText(value, places: places)
     }
 }
 
+/// 主操作按钮的三种语义：忽略（条件不满足）、进入确认页、执行保存。
 enum FundConversionEditorPrimaryAction: Equatable {
     case ignore
     case showConfirmation
     case save
 }
 
+/// 编辑器界面的纯展示文案与动作决策（标题、副标题、按钮文案、submit 动作类型）。
 struct FundConversionEditorPresentation {
     static func headerTitle(isEditing: Bool, isConfirming: Bool) -> String {
         if isConfirming {
@@ -1205,6 +1279,7 @@ struct FundConversionEditorPresentation {
     }
 }
 
+/// 确认页“交易信息”汇总的数据模型（行集合 + 脚注）。
 struct FundConversionConfirmationSummary: Equatable {
     struct Row: Identifiable, Equatable {
         let title: String
@@ -1259,6 +1334,7 @@ struct FundConversionConfirmationSummary: Equatable {
     }
 }
 
+/// 转换效果卡片中的单个指标（标题 + 值 + 是否强调）。
 struct ConversionFlowMetric: Identifiable, Equatable {
     let title: String
     let value: String
@@ -1269,11 +1345,14 @@ struct ConversionFlowMetric: Identifiable, Equatable {
     }
 }
 
+/// 单个基金的净值投影：数值 + 是否已确认（参考净值/行情净值 vs 盘中估算）。
 struct FundConversionPriceProjection: Equatable {
     var value: Double
     var isConfirmed: Bool
 }
 
+/// 整笔转换的金额测算结果（转出/转入净值、各项金额、预估转入份额）。
+/// make 与 priceProjection 负责按“参考净值 > 行情净值 > 盘中估算 > 成本/市值推算”的优先级取值。
 struct FundConversionAmountProjection: Equatable {
     var sourcePrice: FundConversionPriceProjection
     var targetPrice: FundConversionPriceProjection
@@ -1398,6 +1477,7 @@ struct FundConversionAmountProjection: Equatable {
     }
 }
 
+/// 编辑器专用数字格式化工具。
 enum FundConversionFormatter {
     static func numberText(_ value: Double, places: Int) -> String {
         value.formatted(.number.precision(.fractionLength(places)))
@@ -1424,6 +1504,8 @@ private struct ConversionEditorScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
+/// 把“目标基金候选下拉”实现为原生 NSPanel（避免 SwiftUI popover 的焦点/定位问题）。
+/// 在 SwiftUI 中只是一个零尺寸 NSView 锚点，真正的弹层由 Coordinator 管理。
 private struct TargetSuggestionPanelBridge: NSViewRepresentable {
     @Binding var isPresented: Bool
     let funds: [FundPosition]
@@ -1587,10 +1669,14 @@ private struct TargetSuggestionPanelBridge: NSViewRepresentable {
     }
 }
 
+/// 候选弹层内的真实内容（可滚动基金列表，点击即选中）。
 private struct TargetSuggestionPanelContent: View {
     let funds: [FundPosition]
     let onSelect: (FundPosition) -> Void
 
+    /// 视图主体：头部 + 可滚动内容区 + 底部操作栏；统一尺寸与面板背景。
+    /// onAppear 时解析已有目标、预取目标基金元数据与参考净值；
+    /// 多处 onChange 负责在输入变化时刷新测算与候选列表。
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {

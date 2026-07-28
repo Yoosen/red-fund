@@ -19,6 +19,7 @@ struct PortfolioPerformanceView: View {
     @State private var range: PortfolioPerformanceRange
     @State private var displayedMonth: Date
 
+    /// 初始化收益视图：设定初始页 / 排行指标 / 时间范围 / 展示月份（缺失时回退到最近记录日或今天）。
     init(
         portfolioStore: PortfolioStore,
         store: PortfolioPerformanceStore,
@@ -53,6 +54,7 @@ struct PortfolioPerformanceView: View {
         )
     }
 
+    /// 渲染持仓收益主界面：标题栏（含“京东补全”入口）+ 模块切换 + 当前页内容，并把页面/指标/范围/月份变化上报给导航回调。
     var body: some View {
         VStack(spacing: 0) {
             PanelHeader(
@@ -100,6 +102,7 @@ struct PortfolioPerformanceView: View {
         }
     }
 
+    /// 是否显示“京东补全”入口：Beta 开启且当前不在排行页时为真。
     private var showsJDFinanceCompletionAction: Bool {
         HoldingPerformancePresentation.showsJDFinanceCompletionAction(
             page: page,
@@ -107,6 +110,7 @@ struct PortfolioPerformanceView: View {
         )
     }
 
+    /// 生成标题栏副标题：排行页显示持仓数量与收益，曲线/日历页显示追踪起点与记录天数。
     private var headerSubtitle: String {
         if page == .ranking {
             let holdingCount = portfolioStore.snapshot.funds.count {
@@ -124,6 +128,7 @@ struct PortfolioPerformanceView: View {
         return "自 \(start) 起 · \(store.snapshot.days.count) 个记录日"
     }
 
+    /// 按当前页切换内容：排行页显示今日收益排行面板，曲线/日历页显示收益图区块。
     @ViewBuilder
     private var pageContent: some View {
         switch page {
@@ -141,6 +146,7 @@ struct PortfolioPerformanceView: View {
         }
     }
 
+    /// 收益页主体：无记录时显示空态（含京东补全引导）或错误横幅，否则显示汇总、来源说明与曲线/日历。
     @ViewBuilder
     private var performancePageContent: some View {
         if store.snapshot.days.isEmpty {
@@ -176,10 +182,12 @@ struct PortfolioPerformanceView: View {
         }
     }
 
+    /// 全部累计收益曲线点（按日期累加每日收益）。
     private var allPoints: [PortfolioPerformancePoint] {
         PortfolioPerformanceSeries.cumulativePoints(in: store.snapshot)
     }
 
+    /// 当前页是否包含估值数据（用于标题栏“含估值”标识）。
     private var hasVisibleEstimate: Bool {
         switch page {
         case .ranking:
@@ -194,6 +202,7 @@ struct PortfolioPerformanceView: View {
         }
     }
 
+    /// 当前时间范围内的可见收益曲线点（截至最近记录日）。
     private var visiblePoints: [PortfolioPerformancePoint] {
         PortfolioPerformanceSeries.points(
             in: store.snapshot,
@@ -202,6 +211,7 @@ struct PortfolioPerformanceView: View {
         )
     }
 
+    /// 顶部汇总行：记录期累计收益、最近记录日盈亏、记录天数三项指标。
     private var summaryRow: some View {
         HStack(spacing: 8) {
             PerformanceMetric(
@@ -225,6 +235,7 @@ struct PortfolioPerformanceView: View {
         }
     }
 
+    /// 收益来源说明条：京东补全天数、本地记录天数（若有）与覆盖到的日期。
     @ViewBuilder
     private var sourceSummary: some View {
         let jdCount = store.snapshot.days.count { $0.source == .jdFinance }
@@ -256,6 +267,7 @@ struct PortfolioPerformanceView: View {
         }
     }
 
+    /// 累计收益曲线区块：时间范围选择器 + 曲线图 + 起止日期与图例。
     private var curveContent: some View {
         PanelSection(title: "累计收益曲线") {
             VStack(spacing: 10) {
@@ -294,6 +306,7 @@ struct PortfolioPerformanceView: View {
         }
     }
 
+    /// 图表图例单项：标题 + 对应语义色的小圆点。
     private func chartLegendItem(_ title: String, color: Color) -> some View {
         Label {
             Text(title)
@@ -306,6 +319,7 @@ struct PortfolioPerformanceView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// 每日盈亏日历区块：翻月按钮、月汇总、星期表头与日期网格，无记录时显示提示。
     private var calendarContent: some View {
         let grid = PortfolioPerformanceCalendar.grid(monthContaining: displayedMonth)
         let summary = PortfolioPerformanceCalendar.summary(in: store.snapshot, monthContaining: displayedMonth)
@@ -362,6 +376,7 @@ struct PortfolioPerformanceView: View {
         }
     }
 
+    /// 生成翻月按钮（上/下月），目标月份越界时禁用。
     private func monthButton(systemImage: String, offset: Int) -> some View {
         Button {
             displayedMonth = PortfolioPerformanceCalendar.shiftedMonth(from: displayedMonth, by: offset)
@@ -378,6 +393,7 @@ struct PortfolioPerformanceView: View {
         .help(offset < 0 ? "上个月" : "下个月")
     }
 
+    /// 判断偏移后的月份是否仍在记录范围内（不早于首记录月，也不晚于最近记录月或当前月）。
     private func canShiftMonth(by offset: Int) -> Bool {
         let target = PortfolioPerformanceCalendar.shiftedMonth(from: displayedMonth, by: offset)
         guard let targetStart = PortfolioPerformanceCalendar.monthStart(containing: target) else { return false }
@@ -396,6 +412,7 @@ struct PortfolioPerformanceView: View {
         return true
     }
 
+    /// 渲染收益加载/同步的错误提示横幅（警告色背景）。
     private func performanceErrorBanner(_ message: String) -> some View {
         Label(message, systemImage: "exclamationmark.triangle")
             .font(.system(size: 10, weight: .medium))
@@ -410,12 +427,14 @@ struct PortfolioPerformanceView: View {
             )
     }
 
+    /// 金额文本：隐藏金额时返回掩码，否则格式化为带符号金额。
     private func amountText(_ value: Double) -> String {
         hidesAmounts ? "••••" : MoneyFormatter.money(value, signed: true)
     }
 }
 
 enum HoldingPerformancePresentation {
+    /// 是否显示“京东补全”入口：Beta 开启且非排行页时为真。
     static func showsJDFinanceCompletionAction(
         page: HoldingPerformancePage,
         betaFeaturesEnabled: Bool
@@ -423,6 +442,7 @@ enum HoldingPerformancePresentation {
         betaFeaturesEnabled && page != .ranking
     }
 
+    /// 生成排行页副标题文本：持仓数量 +（金额或收益率）的形式。
     static func rankingSubtitle(
         holdingCount: Int,
         holdingIncome: Double,
@@ -445,10 +465,12 @@ private enum PortfolioPerformanceSemanticColor {
     static let positive = Color.red
     static let negative = Color.fundPulseGreen
 
+    /// 按数值正负/中性返回语义色。
     static func color(for value: Double) -> Color {
         color(for: PortfolioPerformanceChartTone(value: value))
     }
 
+    /// 按收益色调返回语义色（正=红、负=绿、中性=灰）。
     static func color(for tone: PortfolioPerformanceChartTone) -> Color {
         switch tone {
         case .positive:
@@ -466,7 +488,9 @@ enum HoldingPerformancePage: String, CaseIterable, Identifiable {
     case curve
     case calendar
 
+    /// 标识符：等于枚举原始值。
     var id: String { rawValue }
+    /// 各页面标题：持仓收益排行 / 收益曲线 / 收益日历。
     var title: String {
         switch self {
         case .ranking:
@@ -485,6 +509,7 @@ private struct PerformanceMetric: View {
     let color: Color
     var detail: String? = nil
 
+    /// 单个指标卡片：标题 + 主值 + 可选明细，带卡片背景与边框。
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
@@ -514,6 +539,7 @@ private struct PortfolioCumulativeProfitChart: View {
     let points: [PortfolioPerformancePoint]
     let hidesAmounts: Bool
 
+    /// 用 Canvas 绘制累计收益曲线：网格线、零线、按盈亏色调分段着色，叠加坐标轴标签与 ¥0 标记。
     var body: some View {
         let values = points.map(\.cumulativeProfit)
         let scale = PortfolioPerformanceChartScale(values: values)
@@ -612,10 +638,12 @@ private struct PortfolioCumulativeProfitChart: View {
         .accessibilityValue(chartAccessibilityValue)
     }
 
+    /// 坐标轴文本：隐藏金额时返回掩码，否则格式化为带符号金额。
     private func axisText(_ value: Double) -> String {
         hidesAmounts ? "••••" : MoneyFormatter.money(value, signed: true)
     }
 
+    /// 按给定比例在起止两点之间插值出坐标点，用于曲线分段绘制。
     private func interpolatedPoint(
         from start: CGPoint,
         to end: CGPoint,
@@ -628,10 +656,12 @@ private struct PortfolioCumulativeProfitChart: View {
         )
     }
 
+    /// 按收益色调取语义色。
     private func color(for tone: PortfolioPerformanceChartTone) -> Color {
         PortfolioPerformanceSemanticColor.color(for: tone)
     }
 
+    /// 曲线无障碍描述：起止日期 + 累计收益（隐藏时说明金额已隐藏）。
     private var chartAccessibilityValue: String {
         guard let first = points.first, let last = points.last else { return "暂无数据" }
         let amount = hidesAmounts ? "金额已隐藏" : MoneyFormatter.money(last.cumulativeProfit, signed: true)
@@ -644,6 +674,7 @@ private struct PerformanceCalendarCell: View {
     let record: PortfolioPerformanceDay?
     let hidesAmounts: Bool
 
+    /// 单日日历格：显示日期与盈亏金额（带估值点），无记录或空白格以占位呈现。
     var body: some View {
         Group {
             if let date {
@@ -673,17 +704,20 @@ private struct PerformanceCalendarCell: View {
         }
     }
 
+    /// 单元格背景色：按盈亏语义色淡化，无记录时回退到次背景色。
     private var cellColor: Color {
         guard let record else { return PanelDesign.inputBackground.opacity(0.42) }
         return PortfolioPerformanceSemanticColor.color(for: record.profit).opacity(0.09)
     }
 
+    /// 紧凑金额文本：隐藏时返回掩码，否则带正负号与紧凑数字格式。
     private func compactAmount(_ value: Double) -> String {
         guard !hidesAmounts else { return "••" }
         let sign = value > 0 ? "+" : value < 0 ? "−" : ""
         return sign + abs(value).formatted(.number.notation(.compactName).precision(.fractionLength(0...1)))
     }
 
+    /// 单元格无障碍描述：日期 + 金额 + 状态 + 来源。
     private func accessibilityText(_ date: String) -> String {
         guard let record else { return "\(date)，无记录" }
         let amount = hidesAmounts ? "金额已隐藏" : MoneyFormatter.money(record.profit, signed: true)

@@ -1,6 +1,8 @@
 import Foundation
 
+/// 将京东金融中同一逻辑买入拆分出的多条订单记录合并为单条。
 enum JDFinanceTradeOrderBatcher {
+    /// 用于判定多个订单是否可合并的批处理键（同一身份、动作、交易日、时段、提交时间）。
     private struct BatchKey: Hashable {
         var identity: String
         var action: JDFinancePendingTradeAction
@@ -9,6 +11,7 @@ enum JDFinanceTradeOrderBatcher {
         var submittedAt: String
     }
 
+    /// 对订单数组做逻辑合并，返回合并后的订单列表。
     static func logicalRecords(_ records: [JDFinanceTradeOrderRecord]) -> [JDFinanceTradeOrderRecord] {
         let groupedIndices = Dictionary(grouping: records.indices) { index in
             batchKey(for: records[index])
@@ -35,6 +38,7 @@ enum JDFinanceTradeOrderBatcher {
         return result
     }
 
+    /// 为单条订单计算可合并键，不满足合并条件时返回 nil。
     private static func batchKey(for record: JDFinanceTradeOrderRecord) -> BatchKey? {
         guard record.action == .buy,
               record.effectiveStatus == .pending || record.effectiveStatus == .succeeded,
@@ -56,6 +60,7 @@ enum JDFinanceTradeOrderBatcher {
         )
     }
 
+    /// 将同一批次的多条订单合并为一条聚合订单。
     static func combinedRecord(_ records: [JDFinanceTradeOrderRecord]) -> JDFinanceTradeOrderRecord? {
         guard records.count > 1,
               let key = records.first.flatMap(batchKey(for:)),
@@ -106,6 +111,7 @@ enum JDFinanceTradeOrderBatcher {
         )
     }
 
+    /// 解析订单的源订单键集合（优先用已有键，否则回退生成）。
     private static func sourceOrderKeys(for record: JDFinanceTradeOrderRecord) -> [String] {
         if !record.sourceOrderKeys.isEmpty {
             return record.sourceOrderKeys
@@ -116,6 +122,7 @@ enum JDFinanceTradeOrderBatcher {
         return [JDFinanceSyncFingerprint.tradeOrderRecord(record)]
     }
 
+    /// 归一化订单身份（优先名称，否则代码）。
     private static func normalizedIdentity(for record: JDFinanceTradeOrderRecord) -> String? {
         if let name = record.productName {
             let normalizedName = name
@@ -134,16 +141,19 @@ enum JDFinanceTradeOrderBatcher {
         return normalizedCode(record.code).map { "code:\($0)" }
     }
 
+    /// 归一化代码，空值返回 nil。
     private static func normalizedCode(_ code: String?) -> String? {
         let value = code?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return value.isEmpty ? nil : value
     }
 
+    /// 归一化提交时间，空值返回 nil。
     private static func normalizedSubmittedAt(_ submittedAt: String?) -> String? {
         let value = submittedAt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return value.isEmpty ? nil : value
     }
 
+    /// 当数组中全部值相等时返回该值，否则 nil。
     private static func commonValue<Value: Hashable>(_ values: [Value]) -> Value? {
         guard let first = values.first,
               values.allSatisfy({ $0 == first })

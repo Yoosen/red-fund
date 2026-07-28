@@ -1,6 +1,7 @@
 import Foundation
 
 enum PortfolioPerformanceRecorder {
+    /// 待写入的一条每日收益记录候选：日期、收益、收益率、确认状态与更新时间。
     struct Candidate: Equatable, Sendable {
         var date: String
         var profit: Double
@@ -9,9 +10,8 @@ enum PortfolioPerformanceRecorder {
         var updatedAt: Date
     }
 
-    /// Returns `true` when every active holding has an official NAV for the
-    /// current Shanghai date, `false` when every holding has at least a current
-    /// estimate, and `nil` when the quote set is stale or incomplete.
+    /// 判断行情确认状态：行情滞后的基金（如 QDII 净值 T+1 披露、估值时间非当日）不参与当日判定；
+    /// 其余活跃持仓都有当日官方净值则返 `true`，均有当日估值则返 `false`；行情缺失或全部滞后则返 `nil`。
     static func quoteConfirmationState(
         portfolio: PortfolioSnapshot,
         quotes: [String: FundQuote],
@@ -24,16 +24,24 @@ enum PortfolioPerformanceRecorder {
 
         let today = DateOnlyFormatter.string(from: now)
         var allConfirmed = true
+        var freshQuoteCount = 0
         for code in activeCodes {
+            // 行情整体缺失时不记录，避免把不完整的组合收益写入日历。
             guard let quote = quotes[code] else { return nil }
             let isConfirmed = quote.netValueDate == today
             let isEstimated = quote.estimateTime.hasPrefix(today)
-            guard isConfirmed || isEstimated else { return nil }
+            // 行情滞后的基金（如 QDII 净值 T+1 披露）不参与当日判定，
+            // 避免一只基金长期否决整个组合的收益记录。
+            guard isConfirmed || isEstimated else { continue }
+            freshQuoteCount += 1
             allConfirmed = allConfirmed && isConfirmed
         }
+        // 全部基金行情都滞后（如非交易日）时不记录。
+        guard freshQuoteCount > 0 else { return nil }
         return allConfirmed
     }
 
+    /// 由当前组合快照生成一条待记录的收益候选：取今日收益与收益率，并按行情是否全部确认标记状态；组合为空或数值异常时返回 nil。
     static func candidate(
         from portfolio: PortfolioSnapshot,
         now: Date,
@@ -55,6 +63,7 @@ enum PortfolioPerformanceRecorder {
         )
     }
 
+    /// 把一条收益候选写入（或更新）收益快照：同日期则按替换规则覆盖，否则追加；并维护追踪起点与本地记录起点，最后排序归一化。
     static func recording(
         _ candidate: Candidate,
         in snapshot: PortfolioPerformanceSnapshot
@@ -96,6 +105,7 @@ enum PortfolioPerformanceRecorder {
         return next
     }
 
+    /// 归一化收益快照：剔除非法/非有限数值的日期，按日期去重并应用替换规则，重新排序，并修正追踪起点与本地记录起点。
     static func normalized(
         _ snapshot: PortfolioPerformanceSnapshot
     ) -> PortfolioPerformanceSnapshot {
@@ -147,6 +157,7 @@ enum PortfolioPerformanceRecorder {
         )
     }
 
+    /// 判断候选记录是否应覆盖已有记录：京东已确认记录优先于本地估值；已确认优先于估值；同状态则按更新时间较新者覆盖。
     private static func shouldReplace(
         existing: PortfolioPerformanceDay,
         with candidate: PortfolioPerformanceDay
@@ -172,6 +183,7 @@ enum PortfolioPerformanceRecorder {
 }
 
 enum PortfolioPerformanceSeries {
+    /// 生成累计收益曲线点：按日期顺序累加每日收益，得到每个时点的累计收益。
     static func cumulativePoints(
         in snapshot: PortfolioPerformanceSnapshot
     ) -> [PortfolioPerformancePoint] {
@@ -183,6 +195,7 @@ enum PortfolioPerformanceSeries {
         }
     }
 
+    /// 生成某时间范围内（截至 endDate）的收益曲线点：先算累计曲线，再按范围截断到对应起点与终点。
     static func points(
         in snapshot: PortfolioPerformanceSnapshot,
         range: PortfolioPerformanceRange,
@@ -197,6 +210,7 @@ enum PortfolioPerformanceSeries {
         return points.filter { $0.day.date >= cutoffText && $0.day.date <= endText }
     }
 
+    /// 按时间范围（1 月/3 月/6 月/1 年/全部）计算曲线的起始截断日期；“全部”返回 nil。
     private static func cutoffDate(
         for range: PortfolioPerformanceRange,
         through endDate: Date
@@ -219,6 +233,7 @@ enum PortfolioPerformanceSeries {
 }
 
 enum PortfolioPerformanceCalendar {
+    /// 返回以上海时区、周一为每周首日的公历日历，作为所有收益日期计算的基准。
     static var shanghaiCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "zh_CN")
@@ -227,6 +242,7 @@ enum PortfolioPerformanceCalendar {
         return calendar
     }
 
+    /// 生成某日期所在月份的日历网格：计算前置空白（按周一为首日）、日期单元格与后置空白，供收益日历展示。
     static func grid(monthContaining date: Date) -> PortfolioPerformanceMonthGrid {
         let calendar = shanghaiCalendar
         guard let monthStart = monthStart(containing: date),
@@ -256,6 +272,7 @@ enum PortfolioPerformanceCalendar {
         )
     }
 
+    /// 汇总某月的收益：统计该月每日盈亏总额、上涨/下跌天数、估值天数，供月份概览展示。
     static func summary(
         in snapshot: PortfolioPerformanceSnapshot,
         monthContaining date: Date
@@ -273,11 +290,13 @@ enum PortfolioPerformanceCalendar {
         )
     }
 
+    /// 把日期按月份偏移（正为后、负为前），用于日历翻月。
     static func shiftedMonth(from date: Date, by offset: Int) -> Date {
         let calendar = shanghaiCalendar
         return calendar.date(byAdding: .month, value: offset, to: date) ?? date
     }
 
+    /// 把日期格式化为“yyyy年 M月”的月份标题文本。
     static func monthTitle(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = shanghaiCalendar
@@ -287,6 +306,7 @@ enum PortfolioPerformanceCalendar {
         return formatter.string(from: date)
     }
 
+    /// 返回包含指定日期的当月第一天（置零时分秒），用于日历网格定位月初。
     static func monthStart(containing date: Date) -> Date? {
         let calendar = shanghaiCalendar
         let components = calendar.dateComponents([.year, .month], from: date)

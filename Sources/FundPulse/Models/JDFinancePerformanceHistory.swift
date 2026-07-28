@@ -1,10 +1,14 @@
 import Foundation
 
+/// 京东金融同步得到的单日收益记录。
 struct JDFinancePerformanceDay: Codable, Equatable, Hashable, Identifiable, Sendable {
     var id: String { date }
 
+    /// 日期（yyyy-MM-dd）。
     var date: String
+    /// 当日收益金额。
     var incomeAmount: Double
+    /// 当日收益率（可选）。
     var incomeRate: Double?
 
     init(date: String, incomeAmount: Double, incomeRate: Double?) {
@@ -14,10 +18,15 @@ struct JDFinancePerformanceDay: Codable, Equatable, Hashable, Identifiable, Send
     }
 }
 
+/// 京东金融历史每日收益集合，并标注覆盖区间与完整性。
 struct JDFinancePerformanceHistory: Codable, Equatable, Sendable {
+    /// 逐日收益记录。
     var days: [JDFinancePerformanceDay]
+    /// 覆盖起始日期。
     var coveredFrom: String
+    /// 覆盖结束日期。
     var coveredThrough: String
+    /// 是否完整覆盖（无缺失区间）。
     var isComplete: Bool
 
     init(
@@ -32,6 +41,7 @@ struct JDFinancePerformanceHistory: Codable, Equatable, Sendable {
         self.isComplete = isComplete
     }
 
+    /// 空历史（加载失败/未同步兜底）。
     static let empty = JDFinancePerformanceHistory(
         days: [],
         coveredFrom: "",
@@ -40,8 +50,11 @@ struct JDFinancePerformanceHistory: Codable, Equatable, Sendable {
     )
 }
 
+/// 京东历史收益同步的日期区间。
 struct JDFinancePerformanceHistoryRange: Equatable, Sendable {
+    /// 起始日期。
     var from: String
+    /// 结束日期。
     var through: String
 
     init(from: String, through: String) {
@@ -50,6 +63,7 @@ struct JDFinancePerformanceHistoryRange: Equatable, Sendable {
     }
 }
 
+/// 京东历史收益同步的错误类型。
 enum JDFinancePerformanceHistoryError: LocalizedError, Equatable {
     case notLoggedIn
     case invalidDateRange
@@ -57,6 +71,7 @@ enum JDFinancePerformanceHistoryError: LocalizedError, Equatable {
     case server(String)
     case network(String)
 
+    /// 各错误对应的中文提示。
     var errorDescription: String? {
         switch self {
         case .notLoggedIn:

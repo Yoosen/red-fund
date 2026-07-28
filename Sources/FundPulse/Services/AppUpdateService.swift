@@ -1,6 +1,8 @@
 import Foundation
 
+/// 应用更新服务：检测 GitHub Releases 更新、下载更新包并安装替换当前 App。
 struct AppUpdateService: Sendable {
+    /// 更新过程中的错误类型。
     enum UpdateError: LocalizedError {
         case invalidResponse
         case noReleaseURL
@@ -48,13 +50,20 @@ struct AppUpdateService: Sendable {
         }
     }
 
+    /// 网络会话。
     private let session: URLSession
+    /// 最新发布页（用于重定向解析最新 tag）。
     private let latestReleaseURL = URL(string: "https://github.com/iamzjt-front-end/fund-pulse/releases/latest")!
+    /// 发布列表基础地址。
     private let releasesBaseURL = URL(string: "https://github.com/iamzjt-front-end/fund-pulse/releases")!
+    /// 交互式检查超时（秒）。
     private let interactiveAPIRequestTimeout: TimeInterval
+    /// 发布订阅信息（latest-mac.yml）请求超时。
     private let releaseFeedRequestTimeout: TimeInterval
+    /// 后台检查超时（秒）。
     private let backgroundAPIRequestTimeout: TimeInterval
 
+    /// 初始化，可注入会话与各阶段超时。
     init(
         session: URLSession = .shared,
         interactiveAPIRequestTimeout: TimeInterval = 5,
@@ -67,6 +76,7 @@ struct AppUpdateService: Sendable {
         self.backgroundAPIRequestTimeout = backgroundAPIRequestTimeout
     }
 
+    /// 检查更新：交互模式带超时，后台模式用更长超时。
     func check(currentVersion: String, mode: AppUpdateCheckMode = .background) async throws -> AppUpdateStatus {
         switch mode {
         case .interactive:
@@ -84,6 +94,7 @@ struct AppUpdateService: Sendable {
         }
     }
 
+    /// 先尝试 GitHub API，失败则回退到 Mac 发布订阅信息。
     private func checkWithReleaseFeedFallback(
         currentVersion: String,
         apiTimeout: TimeInterval
@@ -98,6 +109,7 @@ struct AppUpdateService: Sendable {
         }
     }
 
+    /// 下载更新包：校验为 zip、落盘到更新目录并执行解压暂存。
     func downloadPackage(
         for info: AppUpdateInfo,
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void
@@ -125,6 +137,7 @@ struct AppUpdateService: Sendable {
         return AppUpdatePackage(localURL: downloadedURL, stagedAppURL: stagedAppURL, downloadedAt: .now)
     }
 
+    /// 安装更新包：编写并执行安装脚本替换当前 App。
     func installPackage(_ package: AppUpdatePackage, currentAppURL: URL, processIdentifier: Int32) throws {
         guard currentAppURL.pathExtension == "app" else {
             throw UpdateError.invalidCurrentApp
@@ -163,6 +176,7 @@ struct AppUpdateService: Sendable {
         }
     }
 
+    /// 回退方案：解析 latest-mac.yml 获取版本与下载地址。
     private func checkMacReleaseFeed(currentVersion: String) async throws -> AppUpdateStatus {
         let tag = try await resolveLatestTag()
         let feedURL = releasesBaseURL
@@ -207,6 +221,7 @@ struct AppUpdateService: Sendable {
         return .upToDate(.now)
     }
 
+    /// 主方案：调用 GitHub API 获取最新 release 信息。
     private func checkGitHubAPI(currentVersion: String, timeout: TimeInterval) async throws -> AppUpdateStatus {
         let apiURL = URL(string: "https://api.github.com/repos/iamzjt-front-end/fund-pulse/releases/latest")!
         var request = URLRequest(url: latestReleaseURL)
@@ -251,6 +266,7 @@ struct AppUpdateService: Sendable {
         return .upToDate(.now)
     }
 
+    /// 带超时的竞速封装：操作与超时任务先完成者胜出。
     private func withTimeout<T: Sendable>(
         seconds: TimeInterval,
         operation: @escaping @Sendable () async throws -> T
@@ -290,6 +306,7 @@ struct AppUpdateService: Sendable {
         }
     }
 
+    /// 从最新发布页重定向中解析出最新 tag。
     private func resolveLatestTag() async throws -> String {
         var request = URLRequest(url: latestReleaseURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -305,10 +322,12 @@ struct AppUpdateService: Sendable {
         return tag
     }
 
+    /// 去除版本号前后的 v/V 与空格。
     private func normalizedVersion(_ version: String) -> String {
         version.trimmingCharacters(in: CharacterSet(charactersIn: "vV "))
     }
 
+    /// 从 GitHub 资源列表中按评分选取最佳 zip 下载地址。
     private func preferredDownloadURL(from assets: [GitHubRelease.Asset]) -> URL? {
         let sortedAssets = assets.sorted { lhs, rhs in
             assetScore(lhs.name) > assetScore(rhs.name)
@@ -319,6 +338,7 @@ struct AppUpdateService: Sendable {
             .first
     }
 
+    /// 从 Mac 发布订阅文件中按评分选取下载地址。
     private func preferredDownloadURL(from files: [MacReleaseFeed.File], tag: String) -> URL? {
         let sortedFiles = files.sorted { lhs, rhs in
             assetScore(lhs.url) > assetScore(rhs.url)
@@ -330,6 +350,7 @@ struct AppUpdateService: Sendable {
             .appending(path: file.url)
     }
 
+    /// 资源评分：架构匹配/zip/dmg/swift 关键字加分，用于选取最合适包。
     private func assetScore(_ name: String) -> Int {
         let lowercased = name.lowercased()
         var score = 0
@@ -340,6 +361,7 @@ struct AppUpdateService: Sendable {
         return score
     }
 
+    /// 当前 CPU 架构字符串（arm64 / x86_64）。
     private var currentArchitecture: String {
         #if arch(arm64)
         "arm64"
@@ -350,6 +372,7 @@ struct AppUpdateService: Sendable {
         #endif
     }
 
+    /// 校验 HTTP 响应状态码是否为 2xx。
     private func validateHTTPResponse(_ response: URLResponse) throws {
         if let httpResponse = response as? HTTPURLResponse,
            !(200..<300).contains(httpResponse.statusCode) {
@@ -357,6 +380,7 @@ struct AppUpdateService: Sendable {
         }
     }
 
+    /// 下载文件并在下载进度变化时回调进度（0~1）。
     private func downloadFile(
         request: URLRequest,
         destinationURL: URL,
@@ -406,6 +430,7 @@ struct AppUpdateService: Sendable {
         }
     }
 
+    /// 解压 zip 归档并定位其中的 .app。
     private func stageApp(from archiveURL: URL, in updateDirectory: URL, expectedInfo info: AppUpdateInfo) throws -> URL {
         let extractDirectory = updateDirectory.appending(path: "expanded", directoryHint: .isDirectory)
         try? FileManager.default.removeItem(at: extractDirectory)
@@ -419,6 +444,7 @@ struct AppUpdateService: Sendable {
         return appURL
     }
 
+    /// 校验暂存 App：签名、Bundle ID 一致性、版本不低于预期。
     private func verifyStagedApp(_ appURL: URL, expectedInfo info: AppUpdateInfo) throws {
         try runTool("/usr/bin/codesign", arguments: ["--verify", "--deep", "--strict", appURL.path])
 
@@ -436,6 +462,7 @@ struct AppUpdateService: Sendable {
         }
     }
 
+    /// 在目录树中查找第一个 .app。
     private func findFirstApp(in directory: URL) -> URL? {
         guard let enumerator = FileManager.default.enumerator(
             at: directory,
@@ -451,6 +478,7 @@ struct AppUpdateService: Sendable {
         return nil
     }
 
+    /// 运行命令行工具并校验退出码，非零则抛错。
     private func runTool(_ launchPath: String, arguments: [String]) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: launchPath)
@@ -470,12 +498,14 @@ struct AppUpdateService: Sendable {
         }
     }
 
+    /// 判断版本是否不低于预期（相等或更新）。
     private func isVersion(_ version: String, atLeast expectedVersion: String) -> Bool {
         let normalized = normalizedVersion(version)
         let expected = normalizedVersion(expectedVersion)
         return normalized == expected || VersionComparator.isVersion(normalized, newerThan: expected)
     }
 
+    /// 准备更新目录（Application Support/fund-pulse/Updates）。
     private func prepareUpdateDirectory(removeExisting: Bool = true) throws -> URL {
         let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let updateDirectory = baseURL
@@ -489,6 +519,7 @@ struct AppUpdateService: Sendable {
         return updateDirectory
     }
 
+    /// 安装脚本内容：等待旧 App 退出、备份、ditto 替换、打开新 App、清理备份。
     private var installScript: String {
         """
         #!/bin/sh
@@ -541,10 +572,12 @@ struct AppUpdateService: Sendable {
     }
 }
 
+/// 超时竞速封装：首个完成者（成功/失败）决定结果，避免重复续体恢复。
 private actor TimeoutRace<T: Sendable> {
     private var continuation: CheckedContinuation<T, Error>?
     private var result: Result<T, Error>?
 
+    /// 设置续体；若已有结果则立即恢复。
     func setContinuation(_ continuation: CheckedContinuation<T, Error>) {
         if let result {
             continuation.resume(with: result)
@@ -553,6 +586,7 @@ private actor TimeoutRace<T: Sendable> {
         }
     }
 
+    /// 恢复结果；仅首次生效。
     func resume(_ result: Result<T, Error>) {
         guard self.result == nil else { return }
         self.result = result
@@ -561,16 +595,19 @@ private actor TimeoutRace<T: Sendable> {
     }
 }
 
+/// 下载进度 KVO 观察封装（线程安全）。
 private final class DownloadObservation: @unchecked Sendable {
     private let lock = NSLock()
     private var observation: NSKeyValueObservation?
 
+    /// 设置 KVO 观察。
     func set(_ observation: NSKeyValueObservation) {
         lock.lock()
         self.observation = observation
         lock.unlock()
     }
 
+    /// 失效并释放观察。
     func invalidate() {
         lock.lock()
         observation?.invalidate()
@@ -579,6 +616,7 @@ private final class DownloadObservation: @unchecked Sendable {
     }
 }
 
+/// latest-mac.yml 解析模型。
 private struct MacReleaseFeed {
     struct File: Equatable {
         var url: String
@@ -588,6 +626,7 @@ private struct MacReleaseFeed {
     var releaseDate: Date?
     var files: [File]
 
+    /// 解析 latest-mac.yml 文本为结构化数据。
     static func parse(_ text: String) -> MacReleaseFeed {
         var version: String?
         var releaseDate: Date?
@@ -611,6 +650,7 @@ private struct MacReleaseFeed {
         return MacReleaseFeed(version: version, releaseDate: releaseDate, files: files)
     }
 
+    /// 截取前缀之后的文本并去前后空白。
     private static func value(after prefix: String, in line: String) -> String {
         line
             .dropFirst(prefix.count)
@@ -618,6 +658,7 @@ private struct MacReleaseFeed {
     }
 }
 
+/// GitHub release 解码模型（用于 API 响应）。
 private struct GitHubRelease: Decodable {
     var tagName: String
     var name: String?
@@ -646,7 +687,9 @@ private struct GitHubRelease: Decodable {
     }
 }
 
+/// 版本号比较工具（支持 v 前缀与不定长分段）。
 enum VersionComparator {
+    /// 判断 lhs 是否比 rhs 更新（分段数值比较）。
     static func isVersion(_ lhs: String, newerThan rhs: String) -> Bool {
         let left = components(lhs)
         let right = components(rhs)
@@ -661,6 +704,7 @@ enum VersionComparator {
         return false
     }
 
+    /// 将版本字符串拆分为整数分段。
     private static func components(_ version: String) -> [Int] {
         version
             .trimmingCharacters(in: CharacterSet(charactersIn: "vV "))

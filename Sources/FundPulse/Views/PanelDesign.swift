@@ -88,6 +88,7 @@ enum PanelDesign {
         return NSColor(red: 202 / 255, green: 83 / 255, blue: 13 / 255, alpha: 0.98)
     }
 
+    /// 生成统一风格的描边视图（圆角矩形 + 半透明分隔线色）。
     static func border(cornerRadius: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .stroke(Color(nsColor: .separatorColor).opacity(0.42), lineWidth: 0.6)
@@ -95,11 +96,13 @@ enum PanelDesign {
 }
 
 enum PanelFocusAppearance {
+    /// 禁用内容根视图的焦点光环，返回包装后的 AnyView。
     static func suppressedRoot<Content: View>(_ content: Content) -> AnyView {
         AnyView(content.focusEffectDisabled())
     }
 
     @MainActor
+    /// 生成已禁用焦点光环的 NSHostingView 容器，用于承载 SwiftUI 面板内容。
     static func hostingView<Content: View>(_ content: Content) -> NSHostingView<AnyView> {
         NSHostingView(rootView: PanelFocusAppearance.suppressedRoot(content))
     }
@@ -121,6 +124,7 @@ struct PanelHeader: View {
     var onAction: (() -> Void)? = nil
     let onClose: () -> Void
 
+    /// 渲染面板标题栏：左侧图标 + 标题/副标题，中部可选标识与功能按钮，右侧关闭按钮。
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
@@ -227,6 +231,7 @@ struct PanelSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: () -> Content
 
+    /// 带标题的卡片容器：标题 + 自定义内容，统一卡片背景与描边。
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -248,6 +253,7 @@ struct PanelLinkButton: View {
     var trailingSystemImage = "arrow.up.right"
     let action: () -> Void
 
+    /// 链接式按钮：左图标 + 标题/副标题 + 右跳转箭头，整体可点。
     var body: some View {
         Button(action: action) {
             HStack(spacing: 9) {
@@ -296,6 +302,7 @@ struct PanelSegmentedPicker<Value: Hashable & Identifiable>: View {
     var tint: Color = PanelDesign.accent
     var accessibilityLabelText: String? = nil
 
+    /// 胶囊式分段选择器：点击切换选中并高亮，支持左右方向键导航。
     var body: some View {
         HStack(spacing: 4) {
             ForEach(values) { value in
@@ -360,6 +367,7 @@ struct PanelTextInput: View {
     var suffix: String?
     var isDisabled = false
 
+    /// 初始化文本框：占位符 + 文本绑定 + 可选后缀 + 是否禁用。
     init(_ placeholder: String, text: Binding<String>, suffix: String? = nil, isDisabled: Bool = false) {
         self.placeholder = placeholder
         self._text = text
@@ -367,6 +375,7 @@ struct PanelTextInput: View {
         self.isDisabled = isDisabled
     }
 
+    /// 渲染单行输入框：文本字段 + 可选后缀单位，禁用时降低不透明度。
     var body: some View {
         HStack(spacing: 8) {
             TextField(placeholder, text: $text)
@@ -397,6 +406,7 @@ struct PanelNativeDatePicker: NSViewRepresentable {
     var elements: NSDatePicker.ElementFlags
     var isEnabled = true
 
+    /// 创建触发日期/时间弹窗的 NSButton（AppKit 包装），并绑定协调器。
     func makeNSView(context: Context) -> NSButton {
         let button = NSButton(title: "", target: context.coordinator, action: #selector(Coordinator.showPicker(_:)))
         button.bezelStyle = .rounded
@@ -412,6 +422,7 @@ struct PanelNativeDatePicker: NSViewRepresentable {
         return button
     }
 
+    /// 把选中值、元素类型与可用状态同步到协调器与按钮外观。
     func updateNSView(_ button: NSButton, context: Context) {
         context.coordinator.selection = $selection
         context.coordinator.elements = elements
@@ -421,10 +432,12 @@ struct PanelNativeDatePicker: NSViewRepresentable {
         button.alphaValue = isEnabled ? 1 : 0.58
     }
 
+    /// 创建协调器，桥接 AppKit 弹窗与 SwiftUI 的日期绑定。
     func makeCoordinator() -> Coordinator {
         Coordinator(selection: $selection, elements: elements, isTimeOnly: isTimeOnly)
     }
 
+    /// 是否仅选择时分（不含年月日）：用于切换时间选择器或日历弹窗。
     private var isTimeOnly: Bool {
         elements.contains(.hourMinute) && !elements.contains(.yearMonthDay)
     }
@@ -443,6 +456,7 @@ struct PanelNativeDatePicker: NSViewRepresentable {
         }
 
         @MainActor
+        /// 点击按钮时弹出时间选择器或日历弹窗（再次点击则关闭）。
         @objc func showPicker(_ sender: NSButton) {
             if popover?.isShown == true {
                 popover?.close()
@@ -497,6 +511,7 @@ struct PanelNativeDatePicker: NSViewRepresentable {
         }
 
         @MainActor
+        /// 弹出 SwiftUI 日历选择器弹窗，选择后回写日期并关闭。
         private func showCalendarPicker(relativeTo sender: NSButton) {
             let contentSize = NSSize(width: 300, height: 336)
             let hostingView = NSHostingView(
@@ -525,6 +540,7 @@ struct PanelNativeDatePicker: NSViewRepresentable {
         }
 
         @MainActor
+        /// 时间选择器值变化时写回绑定并刷新按钮标题；非时间选择时直接关闭弹窗。
         @objc func valueChanged(_ sender: NSDatePicker) {
             selection.wrappedValue = sender.dateValue
             updateButtonTitle()
@@ -534,11 +550,13 @@ struct PanelNativeDatePicker: NSViewRepresentable {
         }
 
         @MainActor
+        /// 按当前选中日期刷新按钮标题文本。
         func updateButtonTitle() {
             button?.title = formatted(selection.wrappedValue)
         }
 
         @MainActor
+        /// 弹窗关闭时从注册表注销并清理引用。
         func popoverDidClose(_ notification: Notification) {
             guard let popover = notification.object as? NSPopover else { return }
             PanelAuxiliaryPopoverRegistry.unregister(popover)
@@ -547,6 +565,7 @@ struct PanelNativeDatePicker: NSViewRepresentable {
             }
         }
 
+        /// 把日期格式化为按钮标题文本（仅时分或年月日）。
         private func formatted(_ date: Date) -> String {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "zh_CN")
@@ -571,17 +590,20 @@ enum PanelAuxiliaryPopoverRegistry {
     private static var popovers: [WeakPopover] = []
     private static var recentlyClosedUntil: Date?
 
+    /// 注册一个辅助弹窗到活动列表，并清除“最近关闭”缓冲。
     static func register(_ popover: NSPopover) {
         pruneClosedPopovers()
         popovers.append(WeakPopover(popover))
         recentlyClosedUntil = nil
     }
 
+    /// 注销弹窗，并记录短暂缓冲时段以避免紧接着的鼠标事件误关其他弹窗。
     static func unregister(_ popover: NSPopover) {
         popovers.removeAll { $0.value == nil || $0.value === popover }
         recentlyClosedUntil = Date().addingTimeInterval(0.25)
     }
 
+    /// 面板内发生鼠标按下时：若命中外部辅助弹窗则关闭并返回 true；命中内部则返回 true。
     static func handlePanelMouseDown(at screenLocation: NSPoint) -> Bool {
         pruneClosedPopovers()
 
@@ -604,6 +626,7 @@ enum PanelAuxiliaryPopoverRegistry {
         return true
     }
 
+    /// 清理已关闭或失效的弹窗弱引用，保持活动列表整洁。
     private static func pruneClosedPopovers() {
         popovers.removeAll { popover in
             guard let value = popover.value else { return true }
@@ -622,6 +645,7 @@ private struct PanelCalendarPopoverContent: View {
     private let columns = Array(repeating: GridItem(.fixed(34), spacing: 6), count: 7)
     private let weekdays = ["一", "二", "三", "四", "五", "六", "日"]
 
+    /// 初始化日历弹窗内容：选定日期 + 选择回调，并定位到选定日期所在月。
     init(selectedDate: Date, onSelect: @escaping (Date) -> Void) {
         self.selectedDate = selectedDate
         self.onSelect = onSelect
@@ -632,6 +656,7 @@ private struct PanelCalendarPopoverContent: View {
         _visibleMonth = State(initialValue: calendar.startOfMonth(for: selectedDate))
     }
 
+    /// 渲染日历弹窗：标题与当前选中日 + 月份切换 + 7 列日期网格。
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -715,6 +740,7 @@ private struct PanelCalendarPopoverContent: View {
         .background(PanelDesign.panelBackground)
     }
 
+    /// 当前可见月份标题（yyyy年 M月）。
     private var monthTitle: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
@@ -723,6 +749,7 @@ private struct PanelCalendarPopoverContent: View {
         return formatter.string(from: visibleMonth)
     }
 
+    /// 当前选中日期文本（yyyy/M/d）。
     private var selectedDateText: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
@@ -731,6 +758,7 @@ private struct PanelCalendarPopoverContent: View {
         return formatter.string(from: selectedDate)
     }
 
+    /// 生成 6×7 共 42 格的日期数组（含月初前置空白对应的非当月偏移）。
     private var calendarDays: [CalendarDay] {
         guard let monthInterval = calendar.dateInterval(of: .month, for: visibleMonth),
               let firstGridDate = calendar.date(
@@ -751,6 +779,7 @@ private struct PanelCalendarPopoverContent: View {
         }
     }
 
+    /// 生成圆形图标按钮（用于翻月等动作）。
     private func calendarIconButton(_ systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
@@ -763,23 +792,28 @@ private struct PanelCalendarPopoverContent: View {
         .focusable(false)
     }
 
+    /// 计算某日期在网格中的星期偏移（以周一为每周首日）。
     private func weekdayOffset(from date: Date) -> Int {
         let weekday = calendar.component(.weekday, from: date)
         return (weekday - calendar.firstWeekday + 7) % 7
     }
 
+    /// 前后翻月（offset 为负/正表示上/下月）。
     private func moveMonth(_ offset: Int) {
         visibleMonth = calendar.date(byAdding: .month, value: offset, to: visibleMonth) ?? visibleMonth
     }
 
+    /// 判断日期是否为当前选中日。
     private func isSelected(_ date: Date) -> Bool {
         calendar.isDate(date, inSameDayAs: selectedDate)
     }
 
+    /// 判断日期是否为今天。
     private func isToday(_ date: Date) -> Bool {
         calendar.isDateInToday(date)
     }
 
+    /// 日期文字颜色：选中/非当月/今天/普通 四种情形。
     private func dayForeground(_ day: CalendarDay) -> Color {
         if isSelected(day.date) { return Color(nsColor: .systemBlue) }
         if !day.isCurrentMonth { return Color.secondary.opacity(0.26) }
@@ -787,6 +821,7 @@ private struct PanelCalendarPopoverContent: View {
         return .primary
     }
 
+    /// 日期背景色：选中或今天高亮，其余透明。
     private func dayBackground(_ day: CalendarDay) -> Color {
         if isSelected(day.date) {
             Color(nsColor: .systemBlue).opacity(0.18)
@@ -797,6 +832,7 @@ private struct PanelCalendarPopoverContent: View {
         }
     }
 
+    /// 单日模型：日期与是否当月，用于日历网格渲染。
     private struct CalendarDay: Identifiable {
         let date: Date
         let isCurrentMonth: Bool
@@ -806,6 +842,7 @@ private struct PanelCalendarPopoverContent: View {
 }
 
 private extension Calendar {
+    /// 返回某日期所在月份的第一天（置零时分秒）。
     func startOfMonth(for date: Date) -> Date {
         guard let interval = dateInterval(of: .month, for: date) else { return startOfDay(for: date) }
         return interval.start
@@ -826,6 +863,7 @@ struct PanelButtonLabel: View {
     var isEnabled = true
     @Environment(\.isEnabled) private var environmentIsEnabled
 
+    /// 渲染统一按钮外观：图标 + 标题，按样式与可用性呈现前景/背景/边框/阴影。
     var body: some View {
         HStack(spacing: 6) {
             if let systemImage {
@@ -849,6 +887,7 @@ struct PanelButtonLabel: View {
         .contentShape(Rectangle())
     }
 
+    /// 按钮文字颜色：按样式（主/次/危险）与可用性决定。
     private var foregroundColor: Color {
         switch style {
         case .primary:
@@ -860,6 +899,7 @@ struct PanelButtonLabel: View {
         }
     }
 
+    /// 按钮背景色：按样式与可用性决定（主色填充或中性背景）。
     private var backgroundColor: Color {
         switch style {
         case .primary:
@@ -869,6 +909,7 @@ struct PanelButtonLabel: View {
         }
     }
 
+    /// 按钮边框色：主按钮无边框，其余按样式与可用性决定。
     private var borderColor: Color {
         switch style {
         case .primary:
@@ -880,10 +921,12 @@ struct PanelButtonLabel: View {
         }
     }
 
+    /// 按钮阴影色：仅可用时添加轻微阴影。
     private var shadowColor: Color {
         resolvedIsEnabled ? Color.black.opacity(0.035) : .clear
     }
 
+    /// 综合自身的 isEnabled 与环境可用性，得到最终可用状态。
     private var resolvedIsEnabled: Bool {
         isEnabled && environmentIsEnabled
     }

@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 
+/// 京东历史收益同步策略：定义全量起始日期与重叠天数（用于增量补全）。
 enum JDFinancePerformanceSyncPolicy {
     static let fullHistoryStartDate = "2000-01-01"
     static let overlapDays = 7
@@ -23,6 +24,7 @@ enum JDFinancePerformanceSyncPolicy {
     }
 }
 
+/// 京东账号不匹配的来源分类（持仓基线 / 历史收益 / 两者兼有）。
 enum JDFinancePerformanceAccountMismatchSource: Equatable, Sendable {
     case holdingsBaseline
     case performanceHistory
@@ -48,6 +50,8 @@ enum JDFinancePerformanceAccountMismatchSource: Equatable, Sendable {
     }
 }
 
+/// 京东历史收益同步状态机。
+/// 负责拉取京东历史收益、生成合并预览，并把结果并入本地收益历史（含账号不匹配处理）。
 @Observable
 @MainActor
 final class JDFinancePerformanceSyncStore {
@@ -74,14 +78,17 @@ final class JDFinancePerformanceSyncStore {
     private var generation = 0
     private var syncTask: Task<Void, Never>?
 
+    /// 是否存在京东账号不匹配（需用户处理）。
     var hasAccountMismatch: Bool {
         accountMismatchSource != nil
     }
 
+    /// 当前账号不匹配是否允许「清除旧账号历史收益」以切换账号。
     var canClearPerformanceHistoryForAccountMismatch: Bool {
         accountMismatchSource?.canClearPerformanceHistory == true
     }
 
+    /// 便捷初始化：用默认历史收益服务构造。
     convenience init(
         service: JDFinancePerformanceHistoryService = JDFinancePerformanceHistoryService(),
         now: @escaping () -> Date = { .now }
@@ -100,6 +107,7 @@ final class JDFinancePerformanceSyncStore {
         )
     }
 
+    /// 指定历史拉取函数与时间提供者的初始化方式。
     init(
         fetchHistory: @escaping FetchHistory,
         now: @escaping () -> Date = { .now }
@@ -108,6 +116,7 @@ final class JDFinancePerformanceSyncStore {
         self.nowProvider = now
     }
 
+    /// 触发一次京东历史收益同步：校验登录/账号，拉取并生成合并预览。
     func synchronize(
         performanceStore: PortfolioPerformanceStore,
         cookieHeader: String?,
@@ -133,6 +142,7 @@ final class JDFinancePerformanceSyncStore {
         }
     }
 
+    /// 取消正在进行的同步任务并复位同步状态。
     func cancel() {
         generation &+= 1
         syncTask?.cancel()
@@ -140,6 +150,7 @@ final class JDFinancePerformanceSyncStore {
         isSyncing = false
     }
 
+    /// 将生成的合并预览应用到本地收益历史（可覆盖冲突），返回是否有变更。
     @discardableResult
     func apply(
         to performanceStore: PortfolioPerformanceStore,
@@ -174,6 +185,7 @@ final class JDFinancePerformanceSyncStore {
         }
     }
 
+    /// 清除本地收益历史中的全部京东来源数据（用于切换账号时清理旧数据）。
     static func clearJDFinanceHistory(in performanceStore: PortfolioPerformanceStore) throws {
         var replacement = performanceStore.snapshot
         replacement.days.removeAll { $0.source == .jdFinance }
@@ -182,6 +194,7 @@ final class JDFinancePerformanceSyncStore {
         try performanceStore.replace(replacement)
     }
 
+    /// 执行历史收益同步主流程：校验可读/登录/账号，拉取并生成合并计划。
     private func runSynchronization(
         performanceStore: PortfolioPerformanceStore,
         cookieHeader: String?,
@@ -292,6 +305,7 @@ final class JDFinancePerformanceSyncStore {
         }
     }
 
+    /// 登记账号不匹配来源，并由此更新错误与状态文案。
     private func registerAccountMismatch(
         _ source: JDFinancePerformanceAccountMismatchSource
     ) {
@@ -301,6 +315,7 @@ final class JDFinancePerformanceSyncStore {
         statusMessage = source.message
     }
 
+    /// 综合持仓基线与历史收益来源，判定京东账号不匹配的具体来源分类。
     private static func accountMismatchSource(
         currentAccountKey: String,
         expectedAccountKey: String?,
@@ -330,6 +345,7 @@ final class JDFinancePerformanceSyncStore {
         }
     }
 
+    /// 去除首尾空白后规范化账号键，空值返回 nil。
     private static func normalizedAccountKey(_ value: String?) -> String? {
         guard let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines),
               !normalized.isEmpty
@@ -339,6 +355,7 @@ final class JDFinancePerformanceSyncStore {
         return normalized
     }
 
+    /// 从本地收益快照中提取已有的京东来源历史（供增量补全时传入）。
     private func existingHistory(
         from snapshot: PortfolioPerformanceSnapshot
     ) -> JDFinancePerformanceHistory {
@@ -359,6 +376,7 @@ final class JDFinancePerformanceSyncStore {
     }
 }
 
+/// 提供以上海时区计算的日历（用于历史收益日期推算）。
 private extension Calendar {
     static var shanghai: Calendar {
         var calendar = Calendar(identifier: .gregorian)

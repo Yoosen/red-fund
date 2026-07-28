@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 
+/// 同步流程状态：检查登录态 / 需登录 / 同步中 / 预览 / 错误。
 private enum JDFinanceSyncFlowState: Equatable {
     case checkingSession
     case needsLogin
@@ -9,6 +10,7 @@ private enum JDFinanceSyncFlowState: Equatable {
     case error
 }
 
+/// 可勾选的同步作用域：新增持仓 / 金额收益差异 / 待确认 / 待覆盖对账 / 未入账流水。
 private enum JDFinanceSyncApplyScope: Hashable {
     case newHoldings
     case changedHoldings
@@ -17,6 +19,7 @@ private enum JDFinanceSyncApplyScope: Hashable {
     case unrecordedOrders
 }
 
+/// 手动补全待确认记录所需的输入（交易日 + 时段）。
 private struct JDFinanceManualPendingInput: Equatable {
     var tradeDate: Date?
     var timeType: PositionTimeType?
@@ -28,6 +31,7 @@ private struct JDFinanceManualPendingInput: Equatable {
 }
 
 struct JDFinanceHoldingsSyncView: View {
+    /// 同步时间格式化器（MM-dd HH:mm，上海时区），用于显示最近同步时刻。
     private static let syncTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -55,6 +59,7 @@ struct JDFinanceHoldingsSyncView: View {
     @State private var selectedApplyScopes: Set<JDFinanceSyncApplyScope> = []
     @State private var manualPendingInputs: [String: JDFinanceManualPendingInput] = [:]
 
+    /// 初始化京东持仓同步视图：创建网络探针与同步 store（DEBUG 下把探针持久化到磁盘）。
     @MainActor
     init(
         portfolioStore: PortfolioStore,
@@ -79,6 +84,7 @@ struct JDFinanceHoldingsSyncView: View {
         ))
     }
 
+    /// 渲染京东持仓同步界面：标题栏 + 顶部操作栏 + 内容面板；进入即检查登录态，并提供基线重置/清仓确认弹窗。
     var body: some View {
         VStack(spacing: 0) {
             PanelHeader(
@@ -137,6 +143,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 标题栏副标题：随同步/应用/检查/登录态与预览状态变化。
     private var headerSubtitle: String {
         if syncStore.isSyncing { return "正在拉取京东持仓..." }
         if syncStore.isApplying { return "导入中" }
@@ -145,6 +152,7 @@ struct JDFinanceHoldingsSyncView: View {
         return syncStore.statusMessage
     }
 
+    /// 当前流程状态：检查会话 / 需登录 / 同步中 / 预览 / 错误（驱动界面切换）。
     private var flowState: JDFinanceSyncFlowState {
         if isCheckingExistingSession { return .checkingSession }
         if syncStore.isSyncing { return .syncing }
@@ -154,6 +162,7 @@ struct JDFinanceHoldingsSyncView: View {
         return .needsLogin
     }
 
+    /// 顶部操作栏：主流程控制 + 交易记录/京东链接/重置基线/清除登录等工具按钮。
     private var topActionBar: some View {
         HStack(spacing: 10) {
             primaryFlowControl
@@ -189,6 +198,7 @@ struct JDFinanceHoldingsSyncView: View {
         .padding(.horizontal, 1)
     }
 
+    /// 主流程控制按钮：随 flowState 切换（检查中/登录/同步中/重新同步/重试）。
     @ViewBuilder
     private var primaryFlowControl: some View {
         switch flowState {
@@ -210,6 +220,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 打开京东金融持仓页的链接按钮。
     private var jdFinanceLinkButton: some View {
         Button {
             NSWorkspace.shared.open(JDFinanceWebSession.holdingsURL)
@@ -235,6 +246,7 @@ struct JDFinanceHoldingsSyncView: View {
         .help("在浏览器打开京东金融")
     }
 
+    /// 内容面板：随 flowState 显示检查/需登录/同步中/预览/错误各态。
     @ViewBuilder
     private var contentPanel: some View {
         switch flowState {
@@ -253,6 +265,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 需要登录面板：提示并引导登录京东。
     private var needsLoginPanel: some View {
         VStack(spacing: 12) {
             Image(systemName: "person.crop.circle.badge.exclamationmark")
@@ -290,6 +303,7 @@ struct JDFinanceHoldingsSyncView: View {
         )
     }
 
+    /// 通用进度面板：标题 + 副标题 + 进度圈。
     private func progressPanel(_ title: String, subtitle: String) -> some View {
         VStack(spacing: 10) {
             ProgressView()
@@ -305,6 +319,7 @@ struct JDFinanceHoldingsSyncView: View {
         .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
+    /// 登录成功提示气泡（顶部居中，自动消失）。
     private func loginToast(_ message: String) -> some View {
         HStack(spacing: 7) {
             Image(systemName: "checkmark.circle.fill")
@@ -324,6 +339,7 @@ struct JDFinanceHoldingsSyncView: View {
         .shadow(color: Color.black.opacity(0.12), radius: 8, y: 4)
     }
 
+    /// 预览面板：总览 + 各分类差异卡片（新增/金额收益/未入账/待覆盖/可能清仓/无法识别/京东订单状态/冲突提示）。
     private func previewPanel(_ preview: JDFinanceHoldingsSyncPreview) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             previewOverview(preview)
@@ -443,6 +459,7 @@ struct JDFinanceHoldingsSyncView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
+    /// 预览总览：总资产/持仓收益/昨日收益/产品数与流水完整度，并含“同步选中”按钮与内容勾选区。
     private func previewOverview(_ preview: JDFinanceHoldingsSyncPreview) -> some View {
         let canApply = canApplySelectedData(preview)
         let scopeColumnCount = max(1, min(3, selectableScopeCount(preview)))
@@ -577,6 +594,7 @@ struct JDFinanceHoldingsSyncView: View {
         .overlay(PanelDesign.border(cornerRadius: 12))
     }
 
+    /// 总览小指标：标题 + 值（按语义色）。
     private func overviewMetric(_ title: String, _ value: String, tone: Color) -> some View {
         HStack(spacing: 6) {
             Text(title)
@@ -591,6 +609,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 交易流水完整度标签：完整/不完整/未拉取（对应颜色）。
     private func tradeOrderCompletenessLabel(_ state: JDFinanceTradeOrderFetchState) -> some View {
         let title: String
         let color: Color
@@ -610,6 +629,7 @@ struct JDFinanceHoldingsSyncView: View {
             .foregroundStyle(color)
     }
 
+    /// 无差异项的安静提示汇总（如“无新增 · 无金额差异 · 无未入账流水”）。
     @ViewBuilder
     private func quietPreviewSummary(_ preview: JDFinanceHoldingsSyncPreview) -> some View {
         let quietItems = [
@@ -639,6 +659,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 待确认订单状态摘要：本地待确认/京东待更新/金额已覆盖流水缺失/可同步等计数。
     @ViewBuilder
     private func pendingOrderStateSummary(_ preview: JDFinanceHoldingsSyncPreview) -> some View {
         if !preview.pendingNotices.isEmpty {
@@ -668,10 +689,12 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 是否存在可勾选的同步作用域。
     private func hasSelectableScopes(_ preview: JDFinanceHoldingsSyncPreview) -> Bool {
         selectableScopeCount(preview) > 0
     }
 
+    /// 统计可选同步作用域数量（新增/金额差异/待确认/待覆盖/未入账）。
     private func selectableScopeCount(_ preview: JDFinanceHoldingsSyncPreview) -> Int {
         [
             !preview.newHoldings.isEmpty,
@@ -682,6 +705,7 @@ struct JDFinanceHoldingsSyncView: View {
         ].count(where: { $0 })
     }
 
+    /// 同步作用域勾选开关：点击切换是否在“同步选中”时包含该作用域（新增/金额收益/待确认/待覆盖/未入账）。
     private func syncScopeToggle(
         scope: JDFinanceSyncApplyScope,
         title: String,
@@ -727,6 +751,7 @@ struct JDFinanceHoldingsSyncView: View {
         .disabled(!isAvailable)
     }
 
+    /// 无差异时的空态面板：提示已同步一致（含自动确认的流水数）。
     private var emptyPreviewPanel: some View {
         VStack(spacing: 10) {
             Image(systemName: "checkmark.seal.fill")
@@ -745,6 +770,7 @@ struct JDFinanceHoldingsSyncView: View {
         .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
+    /// 内联同步错误提示：提示本次操作失败但预览已保留。
     private func inlineSyncError(_ message: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -768,6 +794,7 @@ struct JDFinanceHoldingsSyncView: View {
         )
     }
 
+    /// 同步错误面板：显示错误信息并提供“重试同步/登录京东”按钮。
     private var errorPanel: some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -807,6 +834,7 @@ struct JDFinanceHoldingsSyncView: View {
         )
     }
 
+    /// 预览分区容器：标题 + 计数 + 内容；计数为 0 时只显示“无”。
     private func previewSection<Content: View>(
         title: String,
         count: Int,
@@ -842,6 +870,7 @@ struct JDFinanceHoldingsSyncView: View {
         .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
+    /// 新增持仓卡片：展示京东侧金额与持仓收益。
     private func newHoldingCard(_ candidate: JDFinanceHoldingImportCandidate) -> some View {
         comparisonCardHeader(code: candidate.code, name: candidate.name, badge: "新增", tone: PanelDesign.accent) {
             metricPair("京东金额", MoneyFormatter.plainMoney(candidate.amount), tone: .primary)
@@ -849,6 +878,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 金额/收益差异卡片：京东 vs 本地金额与收益，并展示差额。
     private func differenceCard(_ difference: JDFinanceHoldingDifference) -> some View {
         let amountDelta = difference.amountDelta
         let incomeDelta = optionalDelta(difference.jdHoldingIncome, difference.localHoldingIncome)
@@ -870,6 +900,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 京东金额指标标题：含未确认加仓时附带加仓金额提示。
     private func jdAmountMetricTitle(_ difference: JDFinanceHoldingDifference) -> String {
         guard let pendingBuyAmount = difference.jdPendingBuyAmount,
               pendingBuyAmount >= 0.01
@@ -879,6 +910,7 @@ struct JDFinanceHoldingsSyncView: View {
         return "京东（含加仓 \(MoneyFormatter.plainMoney(pendingBuyAmount))）"
     }
 
+    /// 可能清仓卡片：本地有而京东无的持仓，提供“清仓对账”入口（需京东最终卖出/转换出证据）。
     private func missingHoldingCard(_ holding: JDFinanceMissingLocalHolding) -> some View {
         comparisonCardHeader(code: holding.code, name: holding.name, badge: "本地有", tone: .green) {
             HStack(spacing: 8) {
@@ -908,6 +940,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 无法自动识别卡片：京东侧 SKU 未能与本地持仓匹配，仅提示。
     private func unresolvedHoldingCard(_ holding: JDFinanceUnresolvedHolding) -> some View {
         comparisonCardHeader(code: holding.skuID, name: holding.name, badge: "待识别", tone: PanelDesign.warningAccent) {
             HStack(spacing: 8) {
@@ -922,6 +955,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 京东未入账流水卡片：可导入此笔或标记为“当前持仓已包含”。
     private func unrecordedOrderCard(_ order: JDFinanceUnrecordedOrder) -> some View {
         let badge: String = if order.isImportable {
             "可导入"
@@ -971,6 +1005,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 冲突/提示卡片集合：列出警告信息与不参与写入的流水。
     @ViewBuilder
     private func warningAndInformationCards(_ preview: JDFinanceHoldingsSyncPreview) -> some View {
         ForEach(Array(preview.warnings.enumerated()), id: \.offset) { _, warning in
@@ -991,6 +1026,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 待覆盖对账卡片：方向/交易日/金额与份额差额，及匹配到的京东最终流水。
     private func reconciliationNoticeCard(_ notice: JDFinanceReconciliationNotice) -> some View {
         comparisonCardHeader(
             code: notice.code,
@@ -1035,6 +1071,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 对账徽标文本：京东已确认待覆盖 / 本地已确认 / 同步冲突。
     private func reconciliationBadge(for notice: JDFinanceReconciliationNotice) -> String {
         switch notice.state {
         case .jdConfirmedNeedsOverwrite:
@@ -1046,6 +1083,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 对账方向标题：买入/卖出/转换。
     private func reconciliationActionTitle(for notice: JDFinanceReconciliationNotice) -> String {
         switch notice.kind {
         case .trade(_, let action):
@@ -1055,6 +1093,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 返回对账冲突说明文本（非冲突状态返回 nil）。
     private func reconciliationConflictMessage(for notice: JDFinanceReconciliationNotice) -> String? {
         if case .conflict(let message) = notice.state {
             return message
@@ -1062,6 +1101,7 @@ struct JDFinanceHoldingsSyncView: View {
         return nil
     }
 
+    /// 由对账通知生成差额文本（金额/份额/单价，按状态）。
     private func differenceText(for notice: JDFinanceReconciliationNotice) -> String {
         switch notice.state {
         case .jdConfirmedNeedsOverwrite(let difference), .localConfirmedJDPending(let difference):
@@ -1071,6 +1111,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 由差异模型生成差额文本（金额/份额/单价组合）。
     private func differenceText(for difference: JDFinanceSyncDifference) -> String {
         var parts: [String] = []
         if let amountDelta = difference.amountDelta {
@@ -1085,6 +1126,7 @@ struct JDFinanceHoldingsSyncView: View {
         return parts.isEmpty ? "无" : parts.joined(separator: " / ")
     }
 
+    /// 京东订单状态卡片：方向/金额/笔数/预计更新/匹配批次，并提供导入控件。
     private func pendingNoticeCard(_ notice: JDFinanceHoldingPendingNotice) -> some View {
         comparisonCardHeader(
             code: notice.code,
@@ -1137,6 +1179,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 待确认徽标文本：本地已确认/本地待确认/金额已覆盖流水缺失/可同步/需补全。
     private func pendingNoticeBadge(for notice: JDFinanceHoldingPendingNotice) -> String {
         switch notice.localCoverage {
         case .confirmed:
@@ -1153,6 +1196,7 @@ struct JDFinanceHoldingsSyncView: View {
         return "京东待确认"
     }
 
+    /// 待确认金额字段标签：转换为“转换份额”，否则“交易金额”。
     private func pendingNoticeAmountLabel(for notice: JDFinanceHoldingPendingNotice) -> String {
         if case .conversion = notice.importKind {
             return "转换份额"
@@ -1163,6 +1207,7 @@ struct JDFinanceHoldingsSyncView: View {
         return "交易金额"
     }
 
+    /// 待确认金额/份额文本：转换显示份额，否则显示金额。
     private func pendingNoticeAmountText(for notice: JDFinanceHoldingPendingNotice) -> String {
         if case .conversion = notice.importKind {
             let shares = notice.conversionDraft()?.shares ?? notice.pendingDetail?.shares ?? notice.amount
@@ -1175,6 +1220,7 @@ struct JDFinanceHoldingsSyncView: View {
         return notice.amount > 0 ? MoneyFormatter.plainMoney(notice.amount) : "--"
     }
 
+    /// 待确认导入控件：可同步直接导入；需补全则展示手动补全控件。
     @ViewBuilder
     private func pendingNoticeImportControls(_ notice: JDFinanceHoldingPendingNotice) -> some View {
         if notice.isImportable {
@@ -1199,6 +1245,7 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 京东流水记录列表（带标题），逐行展示交易记录。
     private func tradeRecordsList(title: String, records: [JDFinanceTradeOrderRecord]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -1216,6 +1263,7 @@ struct JDFinanceHoldingsSyncView: View {
         .overlay(PanelDesign.border(cornerRadius: 7))
     }
 
+    /// 单条流水行：序号 + 交易时间/金额 + 状态与转换目标。
     private func tradeRecordRow(index: Int, record: JDFinanceTradeOrderRecord) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Text("\(index + 1).")
@@ -1255,12 +1303,14 @@ struct JDFinanceHoldingsSyncView: View {
         }
     }
 
+    /// 流水时间文本：交易日 + 时段。
     private func tradeRecordTimingText(_ record: JDFinanceTradeOrderRecord) -> String {
         [record.tradeDate, record.tradeTimeType?.title]
             .compactMap { $0 }
             .joined(separator: " ")
     }
 
+    /// 流金额/份额文本：转换为份额，否则显示金额。
     private func tradeRecordValueText(_ record: JDFinanceTradeOrderRecord) -> String {
         if record.action == .conversion {
             return shareText(record.shares ?? record.amount ?? 0)
@@ -1268,6 +1318,7 @@ struct JDFinanceHoldingsSyncView: View {
         return record.amount.map(MoneyFormatter.plainMoney) ?? "--"
     }
 
+    /// 把份额格式化为“x 份”（最多 2 位小数）。
     private func shareText(_ value: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal

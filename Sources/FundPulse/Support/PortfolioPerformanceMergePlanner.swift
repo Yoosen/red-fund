@@ -1,10 +1,12 @@
 import Foundation
 
+/// 京东历史收益合并错误类型。
 enum PortfolioPerformanceMergeError: LocalizedError, Equatable {
     case invalidAccount
     case accountMismatch
     case concurrentModification
 
+    /// 错误的人类可读描述。
     var errorDescription: String? {
         switch self {
         case .invalidAccount:
@@ -17,6 +19,7 @@ enum PortfolioPerformanceMergeError: LocalizedError, Equatable {
     }
 }
 
+/// 收益合并冲突（同一天本地与京东取值不同）。
 struct PortfolioPerformanceMergeConflict: Identifiable, Equatable, Sendable {
     var id: String { date }
     var date: String
@@ -24,6 +27,7 @@ struct PortfolioPerformanceMergeConflict: Identifiable, Equatable, Sendable {
     var incoming: PortfolioPerformanceDay
 }
 
+/// 收益合并计划：汇总需自动插入/升级/更新/冲突的天数及元数据。
 struct PortfolioPerformanceMergePlan: Equatable, Sendable {
     fileprivate var baseSnapshot: PortfolioPerformanceSnapshot
     fileprivate var automaticDays: [PortfolioPerformanceDay]
@@ -37,30 +41,40 @@ struct PortfolioPerformanceMergePlan: Equatable, Sendable {
     var zeroValueSkippedCount: Int
     var invalidValueSkippedCount: Int
 
+    /// 是否存在可落盘的天数变更或冲突。
     var hasDayChanges: Bool {
         !automaticDays.isEmpty || !conflicts.isEmpty
     }
 
+    /// 选中变更的天数计数（是否覆盖冲突）。
     func selectedDayChangeCount(overwriteConflicts: Bool) -> Int {
         insertedCount + upgradedCount + updatedCount
             + (overwriteConflicts ? conflicts.count : 0)
     }
 
+    /// 判断计划是否可应用（有选中变更或元数据变化）。
     func canApply(overwriteConflicts: Bool) -> Bool {
         selectedDayChangeCount(overwriteConflicts: overwriteConflicts) > 0 || metadataChanged
     }
 
+    /// 元数据是否相对基线发生变化。
     var metadataChanged: Bool {
         baseSnapshot.jdFinanceSync != metadata
     }
 
+    /// 覆盖起始日期。
     var coveredFrom: String { metadata.coveredFrom }
+    /// 覆盖截止日期。
     var coveredThrough: String { metadata.coveredThrough }
+    /// 是否完整覆盖。
     var isComplete: Bool { metadata.isComplete }
+    /// 来源账号键。
     var accountKey: String { metadata.accountKey }
 }
 
+/// 收益合并规划器：比对京东历史收益与本地收益，产出可应用的合并计划。
 enum PortfolioPerformanceMergePlanner {
+    /// 生成本地收益快照与京东历史的合并计划；账号不匹配或无效时抛错。
     static func plan(
         history: JDFinancePerformanceHistory,
         accountKey: String,
@@ -169,6 +183,7 @@ enum PortfolioPerformanceMergePlanner {
         )
     }
 
+    /// 将合并计划应用到本地收益快照；若快照已被并发修改则抛错。
     static func applying(
         _ plan: PortfolioPerformanceMergePlan,
         to snapshot: PortfolioPerformanceSnapshot,
@@ -192,11 +207,13 @@ enum PortfolioPerformanceMergePlanner {
         return PortfolioPerformanceRecorder.normalized(next)
     }
 
+    /// 判断京东日收益是否为零值（金额与收益率均接近 0）。
     private static func isZeroValue(_ day: JDFinancePerformanceDay) -> Bool {
         abs(day.incomeAmount) < 0.000_000_1
             && abs(day.incomeRate ?? 0) < 0.000_000_1
     }
 
+    /// 比较两天官方取值是否一致（金额 + 收益率）。
     private static func sameOfficialValue(
         _ lhs: PortfolioPerformanceDay,
         _ rhs: PortfolioPerformanceDay
@@ -205,10 +222,12 @@ enum PortfolioPerformanceMergePlanner {
             && sameOptionalRate(lhs.returnRate, rhs.returnRate)
     }
 
+    /// 比较收益金额是否一致（容差 0.005）。
     private static func sameProfit(_ lhs: Double, _ rhs: Double) -> Bool {
         abs(lhs - rhs) < 0.005
     }
 
+    /// 比较可选收益率是否一致（容差 1e-6）。
     private static func sameOptionalRate(_ lhs: Double?, _ rhs: Double?) -> Bool {
         switch (lhs, rhs) {
         case (nil, nil):
@@ -220,6 +239,7 @@ enum PortfolioPerformanceMergePlanner {
         }
     }
 
+    /// 合并京东同步元数据：扩展覆盖区间、判定完成度，无变化时复用旧值。
     private static func mergedMetadata(
         existing: JDFinancePerformanceSyncMetadata?,
         accountKey: String,

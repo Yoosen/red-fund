@@ -1,10 +1,15 @@
 import Foundation
 
+/// 市场时段状态。
 enum MarketSessionState: Equatable {
+    /// 开市（交易时段内）。
     case open
+    /// 午间休市。
     case middayBreak
+    /// 休市（非交易日或交易时段外）。
     case closed
 
+    /// 状态中文标题。
     var title: String {
         switch self {
         case .open:
@@ -17,9 +22,12 @@ enum MarketSessionState: Equatable {
     }
 }
 
+/// 中国基金交易日与交易时段的工具集（基于上海时区）。
 enum TradingCalendar {
+    /// 操作提醒排程的最大天数。
     static let operationReminderScheduleLimit = 30
 
+    /// 预设的法定休市日期区间（用于判定非交易日）。
     private static let marketClosedRanges = [
         ("2026-01-01", "2026-01-03"),
         ("2026-02-15", "2026-02-23"),
@@ -30,6 +38,7 @@ enum TradingCalendar {
         ("2026-10-01", "2026-10-07")
     ]
 
+    /// 上海时区、中文 locale 的中国日历。
     private static var chinaCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "zh_CN")
@@ -37,10 +46,12 @@ enum TradingCalendar {
         return calendar
     }
 
+    /// 根据当前小时返回默认持仓时段（15 点后视为 after15）。
     static func defaultPositionTimeType(now: Date = .now) -> PositionTimeType {
         chinaCalendar.component(.hour, from: now) >= 15 ? .after15 : .before15
     }
 
+    /// 将持仓日期按时段规整为可接受的交易日字符串。
     static func acceptedTradeDate(positionDate: String, timeType: PositionTimeType) -> String {
         guard let date = DateOnlyFormatter.parse(positionDate) else {
             return positionDate
@@ -48,6 +59,7 @@ enum TradingCalendar {
         return DateOnlyFormatter.string(from: acceptedTradeDate(from: date, timeType: timeType))
     }
 
+    /// 返回给定日期文本之后的下一个交易日字符串。
     static func nextFundTradingDate(after dateText: String) -> String? {
         guard let date = DateOnlyFormatter.parse(dateText) else {
             return nil
@@ -55,6 +67,7 @@ enum TradingCalendar {
         return DateOnlyFormatter.string(from: nextFundTradingDay(after: date))
     }
 
+    /// 判断某日期是否为基金交易日（排除周末与休市区间）。
     static func isFundTradingDay(_ date: Date) -> Bool {
         let calendar = chinaCalendar
         let weekday = calendar.component(.weekday, from: date)
@@ -67,6 +80,7 @@ enum TradingCalendar {
         }
     }
 
+    /// 返回当前市场时段状态（非交易日直接为休市）。
     static func marketSessionState(now: Date = .now) -> MarketSessionState {
         let calendar = chinaCalendar
         guard isFundTradingDay(now) else { return .closed }
@@ -77,10 +91,12 @@ enum TradingCalendar {
         return marketSessionState(minutes: minutes, isTradingDay: true)
     }
 
+    /// 当前是否处于开市时段。
     static func isMarketOpen(now: Date = .now) -> Bool {
         marketSessionState(now: now) == .open
     }
 
+    /// 从当前时间起，返回下一个交易时段边界（开盘/午休开始/下午开盘/收盘）。
     static func nextMarketSessionBoundary(after now: Date = .now) -> Date? {
         let calendar = chinaCalendar
         var day = calendar.startOfDay(for: now)
@@ -111,10 +127,12 @@ enum TradingCalendar {
         return nil
     }
 
+    /// 给定分钟数是否处于开市提醒时刻。
     static func isMarketOpenReminderTime(minutes: Int) -> Bool {
         marketSessionState(minutes: minutes, isTradingDay: true) == .open
     }
 
+    /// 生成后续若干交易日的开市提醒时间（用于本地通知排程）。
     static func nextMarketOpenReminderDates(
         minutes: Int,
         from now: Date = .now,
@@ -150,6 +168,7 @@ enum TradingCalendar {
         return dates
     }
 
+    /// 将日期转为带上海时区的通知组件。
     static func notificationDateComponents(from date: Date) -> DateComponents {
         let calendar = chinaCalendar
         var components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
@@ -158,6 +177,7 @@ enum TradingCalendar {
         return components
     }
 
+    /// 按分钟数判定时段状态（核心判定逻辑）。
     private static func marketSessionState(minutes: Int, isTradingDay: Bool) -> MarketSessionState {
         guard isTradingDay else { return .closed }
 
@@ -175,6 +195,7 @@ enum TradingCalendar {
         return .closed
     }
 
+    /// 返回给定日期之后的下一个交易日。
     private static func nextFundTradingDay(after date: Date) -> Date {
         var currentDate = date
         repeat {
@@ -183,6 +204,7 @@ enum TradingCalendar {
         return currentDate
     }
 
+    /// 将持仓日期规整为可接受的交易日（15 点前且为交易日则当日，否则顺延）。
     private static func acceptedTradeDate(from date: Date, timeType: PositionTimeType) -> Date {
         if timeType == .before15, isFundTradingDay(date) {
             return date

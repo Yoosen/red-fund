@@ -25,6 +25,7 @@ struct FundPositionEditorView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    /// 初始化编辑表单：修改时带入已有持仓数据（金额/份额/成本/日期等），新增时初始化空白表单与默认值。
     init(
         store: PortfolioStore,
         fund: FundPosition? = nil,
@@ -85,6 +86,7 @@ struct FundPositionEditorView: View {
         _memo = State(initialValue: fund?.memo ?? "")
     }
 
+    /// 渲染持仓编辑界面：顶部标题、滚动表单（基金识别 + 持仓录入）、底部操作栏，并绑定代码变更自动读取净值逻辑。
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -186,6 +188,7 @@ struct FundPositionEditorView: View {
         }
     }
 
+    /// 顶部标题栏：新增/修改标题切换，并提供关闭按钮。
     private var header: some View {
         PanelHeader(
             systemImage: fund == nil ? "plus" : "pencil",
@@ -195,6 +198,7 @@ struct FundPositionEditorView: View {
         )
     }
 
+    /// 底部操作栏：取消与保存按钮（保存文案随新增/修改、处理中状态变化）。
     private var footer: some View {
         HStack(spacing: 8) {
             Spacer(minLength: 0)
@@ -229,6 +233,7 @@ struct FundPositionEditorView: View {
         }
     }
 
+    /// 显示输入基金代码后读取到的最新净值与净值日期；读取中显示进度，无数据显示“暂无”。
     private var latestNetValueRow: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
@@ -261,6 +266,7 @@ struct FundPositionEditorView: View {
         .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
+    /// 提示“确认净值日”：根据持仓日期与时段算出按哪天净值确认份额与成本。
     private var confirmNetValueTip: some View {
         let dateText = DateOnlyFormatter.string(from: positionDate)
         let acceptedDate = TradingCalendar.acceptedTradeDate(positionDate: dateText, timeType: positionTimeType)
@@ -286,6 +292,7 @@ struct FundPositionEditorView: View {
         )
     }
 
+    /// “当日新增”开关与说明：开启表示今天刚买入并进入待确认，关闭则按历史持仓补录。
     private var sameDayNewFundRow: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 10) {
@@ -314,14 +321,17 @@ struct FundPositionEditorView: View {
         )
     }
 
+    /// 是否为当日新买入的基金（新增且开启“当日新增”）。
     private var isTodayNewFund: Bool {
         fund == nil && isSameDayNewFund
     }
 
+    /// 仅当日新基金才显示交易时点（15:00 前后）选择控件。
     private var shouldShowTradeTimeControls: Bool {
         isTodayNewFund
     }
 
+    /// 校验表单是否可提交：基金代码非空，且金额模式金额 > 0 或份额模式份额与成本均有效。
     private var canSubmit: Bool {
         !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (
             positionMode == .amount
@@ -330,6 +340,7 @@ struct FundPositionEditorView: View {
         )
     }
 
+    /// 表单字段的通用封装：上方标题 + 下方内容视图的纵向布局。
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
@@ -339,6 +350,7 @@ struct FundPositionEditorView: View {
         }
     }
 
+    /// 组装持仓草稿并通过 store 保存；成功后在主线程回调并关闭，失败则显示错误文案。
     private func save() {
         guard !isSaving else { return }
         isSaving = true
@@ -378,6 +390,7 @@ struct FundPositionEditorView: View {
         }
     }
 
+    /// 关闭编辑器：优先调用外部 onClose 回调，否则使用 SwiftUI 的 dismiss。
     private func close() {
         if let onClose {
             onClose()
@@ -386,6 +399,7 @@ struct FundPositionEditorView: View {
         }
     }
 
+    /// 代码变更后防抖地异步拉取最新净值与基金名称：校验 6 位代码后延时查询，回填净值并显示，必要时自动补全名称。
     private func scheduleFundMetadataLookup(for rawCode: String) {
         lookupTask?.cancel()
         let trimmedCode = rawCode.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -425,6 +439,7 @@ struct FundPositionEditorView: View {
         }
     }
 
+    /// 把输入文本解析为 Double：处理全/半角负号、全角逗号与英文千分位。
     private static func number(_ text: String) -> Double? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -436,10 +451,12 @@ struct FundPositionEditorView: View {
         return Double(normalized)
     }
 
+    /// 按指定小数位（默认 2）把数值格式化为字符串。
     private static func text(_ value: Double, places: Int = 2) -> String {
         value.formatted(.number.precision(.fractionLength(0...places)))
     }
 
+    /// 按固定小数位格式化数值（用于金额录入回填，保留指定位数）。
     private static func fixedText(_ value: Double, places: Int) -> String {
         value.formatted(.number.precision(.fractionLength(places)))
     }

@@ -115,6 +115,80 @@ final class PortfolioPerformanceTests: XCTestCase {
         )
     }
 
+    func testQuoteConfirmationIgnoresLaggingQDIIQuote() throws {
+        let now = try shanghaiDate("2026-07-28 14:30")
+        var snapshot = portfolio(todayIncome: 12, todayIncomeRate: 0.2)
+        snapshot.funds[0].isIncomeActive = true
+        snapshot.funds.append(
+            FundPosition(
+                code: "012920",
+                name: "QDII基金",
+                dateText: "07-24 15:00",
+                todayIncome: 0,
+                todayRate: 0,
+                holdingRate: 1,
+                status: .holding,
+                isUpdated: false,
+                isIncomeActive: true
+            )
+        )
+        let domesticEstimate = FundQuote(
+            code: "000001",
+            name: "测试基金",
+            netValue: 1.1,
+            estimatedNetValue: 1.1,
+            growthRate: 0.2,
+            estimateTime: "2026-07-28 14:30",
+            netValueDate: "2026-07-27"
+        )
+        let laggingQDIIQuote = FundQuote(
+            code: "012920",
+            name: "QDII基金",
+            netValue: 3.8989,
+            estimatedNetValue: 4.0528,
+            growthRate: 0.19,
+            estimateTime: "2026-07-25 04:00",
+            netValueDate: "2026-07-24"
+        )
+
+        // QDII 行情滞后（净值 T+1 披露、估值时间非当日）时不再否决整个组合的记录。
+        XCTAssertEqual(
+            PortfolioPerformanceRecorder.quoteConfirmationState(
+                portfolio: snapshot,
+                quotes: ["000001": domesticEstimate, "012920": laggingQDIIQuote],
+                now: now
+            ),
+            false
+        )
+
+        // 全部基金行情都滞后（如非交易日）时仍不记录。
+        let staleDomestic = FundQuote(
+            code: "000001",
+            name: "测试基金",
+            netValue: 1.1,
+            estimatedNetValue: 1.1,
+            growthRate: 0.2,
+            estimateTime: "2026-07-27 15:00",
+            netValueDate: "2026-07-27"
+        )
+        XCTAssertNil(
+            PortfolioPerformanceRecorder.quoteConfirmationState(
+                portfolio: snapshot,
+                quotes: ["000001": staleDomestic, "012920": laggingQDIIQuote],
+                now: now
+            )
+        )
+
+        // 行情整体缺失时仍不记录。
+        XCTAssertNil(
+            PortfolioPerformanceRecorder.quoteConfirmationState(
+                portfolio: snapshot,
+                quotes: ["000001": domesticEstimate],
+                now: now
+            )
+        )
+    }
+
     func testSameDayEstimateUpgradesToConfirmedAndCannotDowngrade() throws {
         let morning = try shanghaiDate("2026-07-15 10:00")
         let evening = try shanghaiDate("2026-07-15 21:00")

@@ -1,10 +1,16 @@
 import Foundation
 
+/// 隐私与免责声明的静态内容模型与文案。
 enum LegalContent {
+    /// 声明中的一个章节（标题 + 段落 + 要点）。
     struct Section: Identifiable, Equatable, Sendable {
+        /// 章节唯一标识。
         let id: String
+        /// 章节标题。
         let title: String
+        /// 段落文本。
         let paragraphs: [String]
+        /// 要点列表。
         let bullets: [String]
 
         init(
@@ -20,11 +26,16 @@ enum LegalContent {
         }
     }
 
+    /// 页面标题。
     static let title = "隐私与免责声明"
+    /// 页面副标题。
     static let subtitle = "数据使用、第三方服务与风险说明"
+    /// 更新日期文本。
     static let updatedAtText = "更新日期：2026 年 7 月 21 日"
+    /// 引导语。
     static let introduction = "Fund Pulse 是一款本地优先的基金持仓与行情查看工具。请在使用前阅读并理解以下说明。"
 
+    /// 声明各章节内容（本地数据、第三方行情、京东同步、更新、支持、不收集项、删除、免责等）。
     static let sections: [Section] = [
         Section(
             id: "local-data",
@@ -112,6 +123,7 @@ enum LegalContent {
         )
     ]
 
+    /// 所有可搜索文本（标题/副标题/段落/要点拼接），用于声明页内搜索。
     static var searchableText: String {
         ([title, subtitle, updatedAtText, introduction] + sections.flatMap { section in
             [section.title] + section.paragraphs + section.bullets

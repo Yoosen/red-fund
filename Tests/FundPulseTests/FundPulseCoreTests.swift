@@ -7585,7 +7585,8 @@ final class FundPulseCoreTests: XCTestCase {
         await firstRefresh.value
         await secondRefresh.value
 
-        XCTAssertEqual(MockURLProtocol.responseStore.requests().count, 2)
+        // 每个刷新轮次包含核心行情 + 天天基金估值两个请求，两轮共 4 个。
+        XCTAssertEqual(MockURLProtocol.responseStore.requests().count, 4)
         XCTAssertEqual(MockURLProtocol.responseStore.maximumConcurrentRequestCount(), 1)
     }
 

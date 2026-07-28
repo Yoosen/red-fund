@@ -1,6 +1,8 @@
 import Foundation
 import Observation
 
+/// 京东持仓同步状态机。
+/// 负责拉取京东持仓快照、生成同步预览，并把选中的数据（新建/变更/待确认/对账/未记录流水/清仓）写入本地持仓。
 @Observable
 @MainActor
 final class JDFinanceHoldingsSyncStore {
@@ -19,6 +21,7 @@ final class JDFinanceHoldingsSyncStore {
     private var syncTask: Task<Void, Never>?
     private var previewAccountKey: String?
 
+    /// 初始化：注入持仓服务、基金代码解析器与时间提供者。
     init(
         service: JDFinanceHoldingsService = JDFinanceHoldingsService(),
         codeResolver: JDFinanceFundCodeResolver = JDFinanceFundCodeResolver(),
@@ -29,6 +32,7 @@ final class JDFinanceHoldingsSyncStore {
         self.nowProvider = now
     }
 
+    /// 触发一次京东持仓同步：校验登录与账号绑定，拉取并解析快照后生成预览。
     func synchronize(portfolioStore: PortfolioStore, cookieHeader: String?) async {
         syncGeneration &+= 1
         let generation = syncGeneration
@@ -49,6 +53,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 执行同步主流程：校验账号、拉取快照、解析代码、构造预览并更新同步元数据。
     private func runSynchronization(
         portfolioStore: PortfolioStore,
         cookieHeader: String?,
@@ -153,6 +158,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 将预览中的「全新持仓」导入本地（仅新增，不改动已有）。
     func applyNewHoldings(to portfolioStore: PortfolioStore) async {
         await applySelectedHoldings(
             to: portfolioStore,
@@ -164,6 +170,7 @@ final class JDFinanceHoldingsSyncStore {
         )
     }
 
+    /// 按用户选择将预览数据写入本地：可分别新增持仓、更新金额、导入待确认、对账覆盖或导入未记录流水。
     func applySelectedHoldings(
         to portfolioStore: PortfolioStore,
         importNew: Bool,
@@ -278,6 +285,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 将单条「待确认交易提示」转为本地草稿并写入（支持手动补全交易日/时段）。
     func applyPendingNotice(
         _ notice: JDFinanceHoldingPendingNotice,
         to portfolioStore: PortfolioStore,
@@ -317,6 +325,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 清除京东登录会话状态，重置同步预览与计数。
     func markSessionCleared() {
         syncGeneration &+= 1
         syncTask?.cancel()
@@ -330,6 +339,7 @@ final class JDFinanceHoldingsSyncStore {
         lastSyncedAt = nil
     }
 
+    /// 将某条未记录流水标记为「当前持仓已包含」，不再提示导入。
     func markUnrecordedOrderAsIncluded(
         _ order: JDFinanceUnrecordedOrder,
         in portfolioStore: PortfolioStore
@@ -356,6 +366,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 重置京东持仓同步基线，迫使下次重新建立基线。
     func resetSyncBaseline(in portfolioStore: PortfolioStore) {
         do {
             try portfolioStore.resetJDFinanceSyncState()
@@ -370,6 +381,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 对「本地缺失的持仓」应用清仓对账：写入清仓流出并记录对应订单已代表。
     func applyFullClearance(
         _ holding: JDFinanceMissingLocalHolding,
         to portfolioStore: PortfolioStore
@@ -405,6 +417,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 将京东未记录流水导入本地（转换或普通交易），并标记为已代表。
     func applyUnrecordedOrder(
         _ order: JDFinanceUnrecordedOrder,
         to portfolioStore: PortfolioStore
@@ -439,6 +452,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 将待确认提示转为持仓/交易/转换草稿并写入本地，附带京东来源同步元数据。
     private func applyPendingNoticeDraft(
         _ notice: JDFinanceHoldingPendingNotice,
         to portfolioStore: PortfolioStore,
@@ -512,6 +526,7 @@ final class JDFinanceHoldingsSyncStore {
         throw JDFinanceHoldingsError.invalidResponse
     }
 
+    /// 校验预览账号与本地绑定一致，返回预览账号键。
     private func validatedPreviewAccount(in portfolioStore: PortfolioStore) throws -> String {
         guard let previewAccountKey else {
             throw PortfolioStoreError.jdFinanceAccountUnidentified
@@ -520,6 +535,7 @@ final class JDFinanceHoldingsSyncStore {
         return previewAccountKey
     }
 
+    /// 校验当前京东账号与本地持仓/收益历史已建立的账号键是否一致，否则抛账号不匹配错误。
     private static func validateAccountBinding(
         _ currentAccountKey: String,
         in portfolioStore: PortfolioStore
@@ -535,6 +551,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 构造一条京东来源的同步元数据（标记待外部确认或已确认）。
     private func syncMetadata(syncKey: String, statusText: String?) -> FundTradeSyncMetadata {
         FundTradeSyncMetadata(
             source: .jdFinance,
@@ -545,6 +562,7 @@ final class JDFinanceHoldingsSyncStore {
         )
     }
 
+    /// 将未记录流水按转换/普通交易草稿导入本地，并附京东来源同步元数据。
     private func importUnrecordedOrder(
         _ order: JDFinanceUnrecordedOrder,
         to portfolioStore: PortfolioStore
@@ -577,7 +595,7 @@ final class JDFinanceHoldingsSyncStore {
     }
 
     private static func writeDebugPreview(_ preview: JDFinanceHoldingsSyncPreview, now: Date) {
-        let notices = preview.pendingNotices.map { notice in
+        let notices = preview.pendingNotices.map { notice -> [String: String] in
             [
                 "code": notice.code,
                 "name": notice.name,
@@ -593,7 +611,7 @@ final class JDFinanceHoldingsSyncStore {
                 "candidateRecords": notice.candidateTradeRecords.map(debugRecordSummary).joined(separator: " || ")
             ]
         }
-        let reconciliations = preview.reconciliationNotices.map { notice in
+        let reconciliations = preview.reconciliationNotices.map { notice -> [String: String] in
             [
                 "code": notice.code,
                 "name": notice.name,
@@ -607,7 +625,7 @@ final class JDFinanceHoldingsSyncStore {
                 "matchedRecords": notice.matchedTradeRecords.map(debugRecordSummary).joined(separator: " || ")
             ]
         }
-        let unresolvedHoldings = preview.unresolvedHoldings.map { holding in
+        let unresolvedHoldings = preview.unresolvedHoldings.map { holding -> [String: String] in
             [
                 "hasSKUReference": holding.skuID.isEmpty ? "false" : "true",
                 "name": holding.name,
@@ -616,7 +634,7 @@ final class JDFinanceHoldingsSyncStore {
                 "message": holding.message
             ]
         }
-        let remoteProducts = preview.remoteSnapshot.products.map { product in
+        let remoteProducts = preview.remoteSnapshot.products.map { product -> [String: String] in
             [
                 "code": product.code,
                 "codeResolution": product.codeResolution.rawValue,
@@ -662,6 +680,7 @@ final class JDFinanceHoldingsSyncStore {
         }
     }
 
+    /// 计算同步后的新同步状态：合并已代表/已忽略订单键，维护待跟踪的待确认流水窗口。
     private static func nextSyncState(
         current: JDFinanceSyncState?,
         remoteSnapshot: JDFinanceHoldingsSnapshot,
@@ -746,7 +765,7 @@ final class JDFinanceHoldingsSyncStore {
     }
 
     private static func debugRecordSummary(_ record: JDFinanceTradeOrderRecord) -> String {
-        [
+        let fields: [String] = [
             record.code ?? "--",
             record.productName ?? "--",
             record.action?.title ?? "--",
@@ -756,7 +775,8 @@ final class JDFinanceHoldingsSyncStore {
             record.tradeDate ?? "--",
             record.tradeTimeType?.title ?? "--",
             record.statusText ?? "--"
-        ].joined(separator: " · ")
+        ]
+        return fields.joined(separator: " · ")
     }
 
     private static func debugSyncState(_ state: JDFinanceSyncPreviewState?) -> String {

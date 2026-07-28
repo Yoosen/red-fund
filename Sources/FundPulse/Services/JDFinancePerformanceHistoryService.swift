@@ -1,18 +1,25 @@
 import Foundation
 
+/// 京东金融历史收益服务：按日期区间拉取每日收益并合并为历史。
 struct JDFinancePerformanceHistoryService: Sendable {
+    /// 历史收益接口地址。
     static let endpoint = URL(
         string: "https://ms.jr.jd.com/gw2/generic/cfGateway/h5/m/getIncomeDateDetailRange"
     )!
+    /// 接口 Referer。
     static let referer = "https://mix.jd.com/mix/asset-mark/home/?conditionType=fund"
+    /// 接口 Origin。
     static let origin = "https://mix.jd.com"
 
+    /// 网络会话。
     private let session: URLSession
 
+    /// 初始化，可注入会话。
     init(session: URLSession = .shared) {
         self.session = session
     }
 
+    /// 拉取历史收益：按区间分年/按年分段请求，合并已有记录去重。
     func fetchHistory(
         cookieHeader: String?,
         from startDate: String,
@@ -85,6 +92,7 @@ struct JDFinancePerformanceHistoryService: Sendable {
         )
     }
 
+    /// 将日期区间拆分为按年/最多 365 天的若干请求子区间。
     static func requestRanges(
         from startDate: String,
         through endDate: String
@@ -127,6 +135,7 @@ struct JDFinancePerformanceHistoryService: Sendable {
         return ranges
     }
 
+    /// 构造历史收益请求（POST，携带 Cookie 与日期区间参数）。
     static func request(
         for range: JDFinancePerformanceHistoryRange,
         cookieHeader: String
@@ -174,6 +183,7 @@ struct JDFinancePerformanceHistoryService: Sendable {
         return request
     }
 
+    /// 精确解析 yyyy-MM-dd 日期（格式不符返回 nil）。
     private static func exactDate(_ value: String) -> Date? {
         guard let date = DateOnlyFormatter.parse(value),
               DateOnlyFormatter.string(from: date) == value
@@ -183,6 +193,7 @@ struct JDFinancePerformanceHistoryService: Sendable {
         return date
     }
 
+    /// 判断响应是否为登录页 HTML（接口未授权时返回）。
     private static func isLoginHTMLResponse(_ response: HTTPURLResponse, data: Data) -> Bool {
         let contentType = response.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
         if contentType.contains("text/html") { return true }
@@ -193,6 +204,7 @@ struct JDFinancePerformanceHistoryService: Sendable {
         return prefix.hasPrefix("<!doctype html") || prefix.hasPrefix("<html")
     }
 
+    /// 上海时区的日历。
     private static var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? .current

@@ -1,6 +1,9 @@
 import Foundation
 import Observation
 
+/// 核心持仓存储（本地唯一数据源）。
+/// 负责持仓快照的加载/保存、基金增删改、交易/转换导入、行情刷新、京东同步原子变更，
+/// 并协同 `PortfolioPerformanceStore` 维护收益历史。
 @Observable
 @MainActor
 final class PortfolioStore {
@@ -18,6 +21,7 @@ final class PortfolioStore {
     private var quoteRefreshDeferralCount = 0
     private var hasDeferredQuoteRefresh = false
 
+    /// 持仓加载状态：加载中 / 已加载 / 缺失明文数据 / 失败。
     enum LoadState: Equatable {
         case loading
         case loaded
@@ -25,6 +29,7 @@ final class PortfolioStore {
         case failed(String)
     }
 
+    /// 用本地数据目录初始化（内部使用 JSON 仓储）。
     init(
         dataDirectory: URL = AppDataPaths.sharedDataDirectory,
         quoteService: FundQuoteService = FundQuoteService(),
@@ -38,6 +43,7 @@ final class PortfolioStore {
         self.performanceStore = performanceStore ?? PortfolioPerformanceStore(dataDirectory: dataDirectory)
     }
 
+    /// 用自定义仓储初始化（便于测试/预览注入）。
     init(
         repository: any PortfolioRepository,
         quoteService: FundQuoteService = FundQuoteService(),
@@ -51,10 +57,12 @@ final class PortfolioStore {
         self.performanceStore = performanceStore ?? PortfolioPerformanceStore(dataDirectory: repository.dataDirectory)
     }
 
+    /// 持仓数据文件路径（委托给仓储）。
     var dataFileURL: URL {
         repository.dataFileURL
     }
 
+    /// 从仓储加载持仓快照与收益历史；处理缺失/失败状态。
     func load() {
         loadState = .loading
         performanceStore.load()
@@ -77,6 +85,7 @@ final class PortfolioStore {
         }
     }
 
+    /// 将持仓（含收益历史）导出为 JSON 文件。
     func exportPortfolio(to url: URL) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -87,6 +96,7 @@ final class PortfolioStore {
         try data.write(to: url, options: .atomic)
     }
 
+    /// 从 JSON 文件导入持仓与收益历史，失败则回滚到导入前状态。
     func importPortfolio(from url: URL) throws {
         let data = try Data(contentsOf: url)
         let decoder = JSONDecoder()
@@ -113,6 +123,7 @@ final class PortfolioStore {
         }
     }
 
+    /// 清空全部持仓（保留收益历史），并持久化。
     func clearAllHoldings() throws {
         let previousSnapshot = snapshot
         let clearedSnapshot = PortfolioSnapshot(
@@ -180,7 +191,16 @@ final class PortfolioStore {
             return
         }
         if case .failed = loadState {
-            return
+            // 失败状态不应让后续刷新永久停摆：内存中仍有持仓数据时直接恢复刷新；
+            // 否则重试加载（数据文件可能只是暂时不可读）。
+            if snapshot.funds.isEmpty {
+                load()
+            } else {
+                loadState = .loaded
+            }
+            if case .failed = loadState {
+                return
+            }
         }
 
         let codes = snapshot.funds.map(\.code)
@@ -3631,7 +3651,7 @@ final class PortfolioStore {
         guard principal > 0 else { throw PortfolioStoreError.invalidCost }
         guard netValue > 0 else { throw PortfolioStoreError.missingNetValue }
 
-        let shares = roundedStoredShares(amount / netValue)
+        let shares = roundedStoredShares(principal / netValue)
         guard shares > 0 else { throw PortfolioStoreError.invalidPosition }
         let cost = roundedCost(principal / shares)
         guard cost > 0 else { throw PortfolioStoreError.invalidCost }

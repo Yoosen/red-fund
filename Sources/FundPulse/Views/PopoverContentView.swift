@@ -1,6 +1,12 @@
 import AppKit
 import SwiftUI
 
+/// 主弹窗（菜单栏点开后的核心界面）相关视图集合。
+/// - MainPanelWindowView：弹窗“外壳”——带箭头的气泡形状、可拖拽改变高度、内嵌 PopoverContentView。
+/// - PopoverContentView：弹窗“内容”——头部总览（金额/收益/实时收益、更新提示、待确认影响）、
+///   工具栏（筛选/排序/操作）、基金列表（或待确认列表）、底部大盘指数条。
+/// 所有交互都通过初始化时注入的回调上抛给 StatusBarController 处理。
+
 struct MainPanelWindowView: View {
     let store: PortfolioStore
     let settingsStore: AppSettingsStore
@@ -197,6 +203,10 @@ private struct PopoverChromeShape: Shape {
     }
 }
 
+/// 主弹窗内容视图（SwiftUI）。
+/// 自上而下：header（总览与状态）→ toolbar（筛选/排序/操作）→ fundList（基金或待确认）
+/// → marketIndexFooter（大盘指数条）。顶部还承载刷新状态、行情更新横幅、更新提示行、
+/// 待确认交易影响条等。金额可通过隐私开关临时隐藏。
 struct PopoverContentView: View {
     let store: PortfolioStore
     let settingsStore: AppSettingsStore
@@ -271,6 +281,8 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 头部总览：刷新状态 + 市场时段徽标 + 隐私开关；状态横幅/更新提示行；
+    /// 持仓金额、持仓收益、持仓收益率三张卡片；待确认影响条；实时收益(元/率) 大区。
     private var header: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
@@ -407,6 +419,7 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 工具栏：左侧持仓/待确认筛选切换，中间排序菜单（点击展开），右侧操作按钮组（添加/刷新/设置等）。
     private var toolbar: some View {
         HStack(spacing: 5) {
             filterSwitchControl
@@ -476,6 +489,8 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 更新提示行：根据 updateStore.status 展示“发现新版本/下载中/已下载/安装中”，
+    /// 并提供下载/立即更新按钮或进度。
     private var appUpdateRow: some View {
         HStack(alignment: .center, spacing: 10) {
             appUpdateRowIcon
@@ -652,6 +667,7 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 更新提示行右侧的“下载 / 现在更新”操作按钮。
     private func appUpdateRowActionButton(title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -670,6 +686,7 @@ struct PopoverContentView: View {
         .help(title)
     }
 
+    /// 工具栏右侧操作组：添加基金、刷新、设置等按钮。
     private var toolbarActionGroup: some View {
         HStack(spacing: 6) {
             toolbarIconButton("plus", "新增基金", tone: PanelDesign.accent, action: onAddFund)
@@ -739,6 +756,7 @@ struct PopoverContentView: View {
             .contentShape(RoundedRectangle(cornerRadius: toolbarIconButtonCornerRadius, style: .continuous))
     }
 
+    /// 持仓 / 待确认 筛选切换控件（选中态带滑动高亮）。
     private var filterSwitchControl: some View {
         HStack(spacing: 2) {
             ForEach(visibleFilters) { value in
@@ -800,6 +818,7 @@ struct PopoverContentView: View {
         .focusable(false)
     }
 
+    /// 切换持仓/待确认筛选，并联动隐藏排序菜单等状态。
     private func selectFilter(_ value: FundListFilter) {
         withAnimation(.easeInOut(duration: 0.12)) {
             filter = value
@@ -807,6 +826,7 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 排序菜单的触发标签（显示当前排序方式）。
     private var sortMenuLabel: some View {
         HStack(spacing: 5) {
             Text(sortMode.title)
@@ -830,6 +850,7 @@ struct PopoverContentView: View {
         .contentShape(Capsule())
     }
 
+    /// 排序菜单展开内容（按实时收益/收益率/持仓收益等多种方式）。
     private var sortMenuContent: some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(FundSortMode.allCases) { mode in
@@ -870,6 +891,7 @@ struct PopoverContentView: View {
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.34 : 0.16), radius: 14, x: 0, y: 8)
     }
 
+    /// 中部列表区：筛选为“待确认”时显示待确认交易列表，否则显示基金列表（支持下拉刷新）。
     private var fundList: some View {
         ScrollView {
             if filter == .pending {
@@ -896,6 +918,7 @@ struct PopoverContentView: View {
         .background(listSurfaceBackground)
     }
 
+    /// 基金列表行：无数据时空状态；否则逐个渲染 FundRowView（按当前筛选/排序）。
     @ViewBuilder
     private var fundRows: some View {
         if filteredFunds.isEmpty {
@@ -926,6 +949,7 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 待确认交易列表：无数据时空状态；否则渲染待确认提醒条 + 各 PendingTradeActivityRow。
     @ViewBuilder
     private var pendingActivityList: some View {
         if pendingActivities.isEmpty {
@@ -954,6 +978,7 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 底部大盘指数条：折叠时显示一行主指数，展开后显示更多指数与市场宽度。
     private var marketIndexFooter: some View {
         VStack(spacing: 0) {
             if isMarketIndexExpanded {
@@ -975,6 +1000,7 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 大盘指数条折叠态：单行展示主指数行情 + 市场宽度概要。
     private var marketIndexCollapsedRow: some View {
         Button {
             withAnimation(.easeInOut(duration: 0.16)) {
@@ -1049,6 +1075,7 @@ struct PopoverContentView: View {
         .help("展开大盘指数")
     }
 
+    /// 大盘指数条展开态：多指数行情网格 + 市场宽度明细。
     private var marketIndexExpandedContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
@@ -1427,6 +1454,7 @@ struct PopoverContentView: View {
         )
     }
 
+    /// 头部刷新状态指示灯：常驻小圆点；手动刷新时以脉冲动画提示进行中。
     private var refreshStatusIndicator: some View {
         ZStack {
             if isManualRefreshFeedbackVisible {
@@ -1456,6 +1484,7 @@ struct PopoverContentView: View {
             }
     }
 
+    /// 市场时段徽标：根据 TradingCalendar 显示 交易中/午休/休市 等状态并着色。
     private var marketBadge: some View {
         let state = TradingCalendar.marketSessionState()
         return Text(state.title)
@@ -1471,6 +1500,7 @@ struct PopoverContentView: View {
             .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.12), radius: 6, x: 0, y: 3)
     }
 
+    /// 隐私开关：切换头部金额/收益的显示与隐藏（AppStorage 持久化）。
     private var privacyToggleButton: some View {
         Button(action: toggleHeaderAmountPrivacy) {
             Image(systemName: hidesHeaderAmounts ? "eye.slash.fill" : "eye.fill")
@@ -1503,6 +1533,7 @@ struct PopoverContentView: View {
             : Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.05)
     }
 
+    /// 切换头部金额/收益是否隐藏（写入 AppStorage）。
     private func toggleHeaderAmountPrivacy() {
         withAnimation(.easeInOut(duration: 0.16)) {
             hidesHeaderAmounts.toggle()
@@ -1512,6 +1543,7 @@ struct PopoverContentView: View {
 
     private var hiddenMoneyPlaceholder: String { "***" }
 
+    /// 头部金额文本（隐藏时显示掩码）。
     private func headerMoneyText(_ value: Double) -> String {
         hidesHeaderAmounts ? hiddenMoneyPlaceholder : MoneyFormatter.plainMoney(value)
     }
@@ -1584,6 +1616,7 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 顶部状态横幅要展示的文案（如刷新失败提示），无则隐藏。
     private var statusMessage: String? {
         switch store.loadState {
         case .missingPlainData(let hasLegacyStore) where hasLegacyStore:
@@ -1603,6 +1636,7 @@ struct PopoverContentView: View {
         isRefreshing
     }
 
+    /// 刷新状态文案（如“已更新”“刷新中”）。
     private var refreshStatusText: String {
         if isManualRefreshFeedbackVisible {
             return "正在刷新基金数据..."
@@ -1646,6 +1680,7 @@ struct PopoverContentView: View {
         }
     }
 
+    /// 顶部状态横幅（如刷新失败提示）。
     private func statusBanner(_ message: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: storeFailureSymbol)
@@ -1667,6 +1702,7 @@ struct PopoverContentView: View {
         return "lock.doc"
     }
 
+    /// 头部指标卡片（标题 + 数值，按盈亏/总额着色，支持隐藏）。
     private func metricCard(
         _ title: String,
         _ value: String,
@@ -1709,6 +1745,7 @@ struct PopoverContentView: View {
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.12 : 0.035), radius: 8, x: 0, y: 4)
     }
 
+    /// 待确认交易影响条：点按跳到“待确认”筛选，展示其将带来的金额/收益变化。
     private func pendingImpactBar(_ impact: PendingHeaderImpact) -> some View {
         HStack(spacing: 9) {
             Image(systemName: "clock.badge.exclamationmark")
@@ -1798,6 +1835,7 @@ struct PopoverContentView: View {
         return "净额"
     }
 
+    /// 指标卡片数值颜色（涨红跌绿，总额默认主色）。
     private func metricCardValueColor(_ tone: Double?, isTotal: Bool) -> Color {
         if hidesHeaderAmounts {
             return hiddenAmountColor
@@ -2069,6 +2107,7 @@ struct PopoverContentView: View {
               blue: colorScheme == .dark ? 23 / 255 : 246 / 255)
     }
 
+    /// 指标卡片背景（按盈亏深浅着色）。
     private func metricCardBackground(_ tone: Double?, isTotal: Bool = false) -> some ShapeStyle {
         if isTotal {
             return AnyShapeStyle(
@@ -2098,6 +2137,7 @@ struct PopoverContentView: View {
         return AnyShapeStyle(metricCardBaseBackground)
     }
 
+    /// 按当前筛选/排序得到的基金列表（供 fundRows 渲染）。
     private var filteredFunds: [FundPosition] {
         let records = tradeRecords
         let funds = store.snapshot.funds.filter { fund in
@@ -2128,6 +2168,7 @@ struct PopoverContentView: View {
         pendingActivities.count
     }
 
+    /// 待确认交易对持仓总额/收益的影响汇总（用于头部影响条）。
     private var pendingHeaderImpact: PendingHeaderImpact? {
         PendingHeaderImpact.make(activities: pendingActivities)
     }
@@ -2140,10 +2181,12 @@ struct PopoverContentView: View {
         store.snapshot.tradeRecords ?? []
     }
 
+    /// 当前待确认交易列表（供 pendingActivityList 渲染）。
     private var pendingActivities: [PendingTradeActivity] {
         PendingTradeActivityBuilder.make(from: store.snapshot)
     }
 
+    /// 当前待确认交易的 ID 列表（用于驱动“已忽略提醒”持久化与归一化）。
     private var pendingActivityIDs: [String] {
         pendingActivities.map(\.id)
     }
@@ -2237,6 +2280,7 @@ struct PopoverContentView: View {
     }
 
     @MainActor
+    /// 下拉刷新触发的异步刷新：调用注入的 onRefresh，并短暂显示手动刷新反馈动画。
     private func refreshWithFeedback() async {
         guard !isRefreshRequestInProgress else { return }
 
@@ -7548,6 +7592,7 @@ private func toneColor(for value: Double) -> Color {
     return Color.secondary
 }
 
+/// 实时收益(元)文本：隐藏金额时显示掩码，否则按涨跌着色。
 private func todayIncomeAmount(_ value: Double, isMasked: Bool = false) -> Text {
     if isMasked {
         return Text("***")

@@ -13,6 +13,8 @@ enum JDFinanceHoldingsSyncPlanner {
         var orders: [JDFinanceTradeOrderRecord]
     }
 
+    /// 计算京东持仓与本地账本的同步预览：比对新增/金额差异/待确认订单/需覆盖流水/可能清仓/未入账流水等。
+    /// 是所有同步判断的入口，返回的 `JDFinanceHoldingsSyncPreview` 供同步界面展示与用户勾选。
     static func preview(
         remoteSnapshot: JDFinanceHoldingsSnapshot,
         localSnapshot: PortfolioSnapshot
@@ -279,6 +281,7 @@ enum JDFinanceHoldingsSyncPlanner {
         )
     }
 
+    /// 生成本地已存在待确认记录时的提示文案：根据京东订单状态描述“仍处理中/尚未确认份额”。
     private static func localPendingConfirmationMessage(
         for product: JDFinanceHoldingProduct
     ) -> String {
@@ -301,6 +304,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return "本次同步已完成；京东仍标记为交易处理中，尚未完成基金份额确认。"
     }
 
+    /// 合并京东返回的同代码多条持仓：名称一致则累加金额/收益；若名称不一致则禁止自动写入并降级为未识别。
     private static func consolidatedProducts(_ products: [JDFinanceHoldingProduct]) -> ConsolidatedProducts {
         var unresolved = products.filter { !$0.isCodeResolved }
         var resolvedGroups: [String: [JDFinanceHoldingProduct]] = [:]
@@ -344,11 +348,13 @@ enum JDFinanceHoldingsSyncPlanner {
         return ConsolidatedProducts(products: consolidated + unresolved, warnings: warnings)
     }
 
+    /// 把一组可选金额求和；若全部为空则返回 nil。
     private static func summedOptional(_ values: [Double?]) -> Double? {
         let resolved = values.compactMap { $0 }
         return resolved.isEmpty ? nil : resolved.reduce(0, +)
     }
 
+    /// 为京东未返回明确代码的持仓补全代码：优先用匹配的成交订单代码，其次用基金名称与本地账本匹配。
     private static func resolvedProduct(
         _ product: JDFinanceHoldingProduct,
         localFundsByCode: [String: FundPosition],
@@ -383,6 +389,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return resolved
     }
 
+    /// 若产品的待确认详情里所有成交订单指向同一个基金代码（且不同于产品原代码），返回该代码用于补全解析。
     private static func commonMatchedTradeOrderCode(for product: JDFinanceHoldingProduct) -> String? {
         let action = product.pendingDetail?.action ?? product.transactionTip?.action ?? .unknown
         guard action != .conversion else { return nil }
@@ -406,16 +413,19 @@ enum JDFinanceHoldingsSyncPlanner {
         return code
     }
 
+    /// 去除代码首尾空白；为空则返回 nil。
     private static func normalizedCode(_ code: String?) -> String? {
         let trimmed = code?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty ? nil : trimmed
     }
 
+    /// 判断两个基金名称是否很可能指同一只基金：比较两者的规范化/标准名称键值集合是否有交集。
     private static func namesLikelyMatch(_ lhs: String, _ rhs: String) -> Bool {
         let lhsKeys = Set(nameLookupKeys(for: lhs))
         return nameLookupKeys(for: rhs).contains { lhsKeys.contains($0) }
     }
 
+    /// 按名称规范化键值建立本地基金查表；遇到重复名称键则置为 nil，避免误匹配。
     private static func localFundsByNormalizedName(_ funds: [FundPosition]) -> [String: FundPosition] {
         var result: [String: FundPosition] = [:]
         var duplicateKeys = Set<String>()
@@ -436,6 +446,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return result
     }
 
+    /// 返回用于名称匹配的键集合：规范化名称 + 去除“中证/转换/转入/转出”前缀后的标准名称。
     private static func nameLookupKeys(for value: String) -> [String] {
         var keys: [String] = []
         appendUnique(normalizedName(value), to: &keys)
@@ -443,6 +454,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return keys
     }
 
+    /// 规范化基金名称：去空白、去所有空白字符、转小写，便于比较。
     private static func normalizedName(_ value: String) -> String {
         value
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -450,6 +462,7 @@ enum JDFinanceHoldingsSyncPlanner {
             .lowercased()
     }
 
+    /// 标准基金名称：在规范化基础上去掉“中证/转换-/转入-/转出-”等前缀，使同类名称可对齐。
     private static func canonicalFundName(_ value: String) -> String {
         normalizedName(value)
             .replacingOccurrences(of: "中证", with: "")
@@ -458,20 +471,24 @@ enum JDFinanceHoldingsSyncPlanner {
             .replacingOccurrences(of: "转出-", with: "")
     }
 
+    /// 把非空且不在集合中的值追加进去，避免重复键。
     private static func appendUnique(_ value: String, to values: inout [String]) {
         guard !value.isEmpty, !values.contains(value) else { return }
         values.append(value)
     }
 
+    /// 两个可选金额是否不同（任一为 nil 则视为无差异）。
     private static func optionalMoneyDifference(_ lhs: Double?, _ rhs: Double?) -> Bool {
         guard let lhs, let rhs else { return false }
         return moneyDifference(lhs, rhs)
     }
 
+    /// 两个金额（四舍五入至分）是否不同。
     private static func moneyDifference(_ lhs: Double, _ rhs: Double) -> Bool {
         roundedMoney(lhs) != roundedMoney(rhs)
     }
 
+    /// 计算对比“待确认买入”时应扣除的京东待确认金额：若本地与京东全额已一致则不扣（避免误判差异）。
     private static func pendingBuyAmountForComparison(
         product: JDFinanceHoldingProduct,
         localAmount: Double
@@ -485,10 +502,12 @@ enum JDFinanceHoldingsSyncPlanner {
         return product.syncedPendingBuyAmount
     }
 
+    /// 金额四舍五入至分（两位小数）。
     private static func roundedMoney(_ value: Double) -> Double {
         (value * 100).rounded() / 100
     }
 
+    /// 份额四舍五入至小数点后 6 位。
     private static func roundedShares(_ value: Double) -> Double {
         (value * 1_000_000).rounded() / 1_000_000
     }
@@ -510,6 +529,7 @@ enum JDFinanceHoldingsSyncPlanner {
         }
     }
 
+    /// 为京东待确认产品寻找对应的本地已确认交易记录：按买入/卖出/转换分别匹配金额或份额，处理批量买入与转换目标。
     private static func localConfirmedCandidate(
         for product: JDFinanceHoldingProduct,
         records: [FundTradeRecord]
@@ -583,6 +603,7 @@ enum JDFinanceHoldingsSyncPlanner {
         var positionOnly = 0
     }
 
+    /// 当京东一笔待确认对应本地多笔同日期/时段/金额的买入时，把这些本地记录作为一组批量候选返回。
     private static func confirmedBuyBatchCandidate(
         _ candidates: [FundTradeRecord],
         product: JDFinanceHoldingProduct
@@ -624,6 +645,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return LocalConfirmedCandidate(records: matchedRecords)
     }
 
+    /// 统计京东待确认买入在本地交易记录中的覆盖情况：已确认/本地待确认/仅金额覆盖各多少笔。
     private static func pendingBuyCoverageCounts(
         for product: JDFinanceHoldingProduct,
         localTradeRecords: [FundTradeRecord]
@@ -671,6 +693,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return result
     }
 
+    /// 在候选本地记录中筛选唯一匹配项：仍需京东最终确认的记录直接入选；否则按金额（买入）或份额（卖出/转换）是否一致判断，唯一才返回。
     private static func uniqueConfirmedCandidate(
         _ candidates: [FundTradeRecord],
         product: JDFinanceHoldingProduct,
@@ -698,6 +721,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return qualified.count == 1 ? qualified[0] : nil
     }
 
+    /// 判断本地记录的交易日期/时段是否与京东产品提示一致（两者任一缺失即视为可匹配）。
     private static func timingMatches(
         record: FundTradeRecord,
         tradeDate: String?,
@@ -712,6 +736,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return tradeDate != nil || tradeTimeType != nil
     }
 
+    /// 判断京东转换产品的目标基金是否与本地转换记录的目标（代码或名称）一致。
     private static func conversionTargetMatches(
         product: JDFinanceHoldingProduct,
         record: FundTradeRecord
@@ -733,6 +758,7 @@ enum JDFinanceHoldingsSyncPlanner {
         }
     }
 
+    /// 计算京东待确认与本地已确认记录之间的金额/份额差额，用于展示“本地已确认·京东待更新”的差异。
     private static func pendingDifference(
         product: JDFinanceHoldingProduct,
         candidate: LocalConfirmedCandidate
@@ -754,6 +780,8 @@ enum JDFinanceHoldingsSyncPlanner {
         case ambiguous
     }
 
+    /// 对账核心：遍历本地“等待京东最终确认”的交易，与京东成功流水逐一匹配，
+    /// 产出需要覆盖的差异通知（jdConfirmedNeedsOverwrite）和可直接自动确认的记录（一致时）。
     private static func reconciliationResult(
         remoteProducts: [JDFinanceHoldingProduct],
         remoteSnapshot: JDFinanceHoldingsSnapshot,
@@ -927,12 +955,14 @@ enum JDFinanceHoldingsSyncPlanner {
         )
     }
 
+    /// 判断本地交易是否处于“已写入但等待京东最终确认”的状态（来自京东来源或显式等待外部确认）。
     private static func waitsForJDFinalConfirmation(_ record: FundTradeRecord) -> Bool {
         record.syncSource == .jdFinance
             && ((record.waitsForExternalConfirmation ?? false)
                 || record.externalStatus == .waitingExternalConfirmation)
     }
 
+    /// 汇总对账可用的全部京东订单：快照中的交易订单 + 各产品待确认详情里携带的成交/候选记录（去重后追加）。
     private static func allTradeOrders(
         remoteSnapshot: JDFinanceHoldingsSnapshot,
         remoteProducts: [JDFinanceHoldingProduct]
@@ -956,6 +986,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return records
     }
 
+    /// 为普通买入/卖出本地记录寻找匹配的京东订单：先用稳定键精确匹配，否则按金额/份额等候选筛选（唯一/模糊/缺失）。
     private static func matchingTradeOrderIndex(
         for record: FundTradeRecord,
         in orders: [JDFinanceTradeOrderRecord],
@@ -977,6 +1008,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return selectOrderIndex(for: record, candidates: candidates, orders: orders)
     }
 
+    /// 为转换（转出）本地记录寻找匹配的京东转换订单：稳定键优先，其次按转换动作与目标匹配（唯一/模糊/缺失）。
     private static func matchingConversionOrderIndex(
         for record: FundTradeRecord,
         in orders: [JDFinanceTradeOrderRecord],
@@ -998,6 +1030,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return selectOrderIndex(for: record, candidates: candidates, orders: orders)
     }
 
+    /// 用本地记录的稳定同步键（syncKey/指纹）在候选订单中精确匹配：唯一命中返回 matched，多命中返回 ambiguous，无键则 nil。
     private static func stableOrderMatch(
         syncKey: String?,
         fallbackCode: String,
@@ -1018,6 +1051,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return matches.isEmpty ? nil : .ambiguous
     }
 
+    /// 在金额/份额一致的候选订单中定序：唯一精确值命中返回；可安全合并多笔时返回合并索引；否则报模糊冲突。
     private static func selectOrderIndex(
         for record: FundTradeRecord,
         candidates: [Int],
@@ -1043,6 +1077,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return .ambiguous
     }
 
+    /// 比较京东订单与本地记录在金额（或份额）上是否一致，用于无稳定键时的候选判定。
     private static func orderValuesMatch(_ order: JDFinanceTradeOrderRecord, record: FundTradeRecord) -> Bool {
         var compared = false
         if let orderAmount = order.amount, let localAmount = record.amount {
@@ -1056,6 +1091,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return compared
     }
 
+    /// 判断京东订单是否对应一笔普通买/卖本地记录（代码、日期、时段、动作方向均一致）。
     private static func tradeOrder(_ order: JDFinanceTradeOrderRecord, matches record: FundTradeRecord) -> Bool {
         guard orderIdentityMatches(order, record: record),
               order.tradeDate == record.tradeDate,
@@ -1073,6 +1109,7 @@ enum JDFinanceHoldingsSyncPlanner {
         }
     }
 
+    /// 判断京东订单是否对应一笔转换（转出）本地记录（动作、日期、时段一致，且目标代码匹配）。
     private static func conversionOrder(_ order: JDFinanceTradeOrderRecord, matches record: FundTradeRecord) -> Bool {
         guard order.action == .conversion,
               orderIdentityMatches(order, record: record),
@@ -1087,6 +1124,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return true
     }
 
+    /// 判断京东订单与本地记录是否为同一基金：优先比代码，其次按产品名称模糊匹配。
     private static func orderIdentityMatches(_ order: JDFinanceTradeOrderRecord, record: FundTradeRecord) -> Bool {
         if let code = normalizedCode(order.code) {
             return code == record.code
@@ -1095,12 +1133,14 @@ enum JDFinanceHoldingsSyncPlanner {
         return namesLikelyMatch(productName, record.name)
     }
 
+    /// 生成“缺少京东最终流水”的提示文案：区分流水已完整拉取（不能安全覆盖）与拉取不完整（无法判断）两种情形。
     private static func missingFinalOrderMessage(_ snapshot: JDFinanceHoldingsSnapshot) -> String {
         snapshot.tradeOrderFetchState.isComplete || snapshot.tradeOrderFetchState == .notRequested
             ? "缺少京东最终流水，不能安全覆盖流水"
             : "京东交易流水拉取不完整，暂不能判断是否缺少最终流水"
     }
 
+    /// 找出京东成功但本地没有对应交易的流水：已建立同步基线的快照会跳过已纳入/已忽略的订单，给出可导入候选。
     private static func unrecordedOrders(
         orders: [JDFinanceTradeOrderRecord],
         consumedOrderIndices: Set<Int>,
@@ -1144,10 +1184,12 @@ enum JDFinanceHoldingsSyncPlanner {
         return result
     }
 
+    /// 返回订单的稳定身份键（优先 stableOrderKey，否则用指纹），用于对账去重与已覆盖判定。
     private static func orderIdentityKey(_ order: JDFinanceTradeOrderRecord) -> String {
         order.stableOrderKey ?? JDFinanceSyncFingerprint.tradeOrderRecord(order)
     }
 
+    /// 找出某本地基金在京东侧最近的一笔成功卖出/转换出流水，作为“可能清仓”的证据。
     private static func successfulOutflowEvidence(
         for fund: FundPosition,
         orders: [JDFinanceTradeOrderRecord]
@@ -1169,6 +1211,7 @@ enum JDFinanceHoldingsSyncPlanner {
             }
     }
 
+    /// 收集“仅作提示、不写入本地”的京东流水：未成功订单，或与等待确认的本地记录/已跟踪订单相关者。
     private static func informationalOrders(
         _ orders: [JDFinanceTradeOrderRecord],
         products: [JDFinanceHoldingProduct],
@@ -1219,6 +1262,7 @@ enum JDFinanceHoldingsSyncPlanner {
         }
     }
 
+    /// 判断京东订单是否已被本地记录等价覆盖（稳定键相等，或身份+金额/份额一致），用于未入账去重。
     private static func localOrderEquivalent(
         _ order: JDFinanceTradeOrderRecord,
         record: FundTradeRecord
@@ -1240,6 +1284,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return identityMatches && orderValuesMatch(order, record: record)
     }
 
+    /// 由京东订单推导普通买/卖本地记录的最终金额/份额/单价与状态，作为覆盖写入依据。
     private static func reconciliationValues(
         record: FundTradeRecord,
         order: JDFinanceTradeOrderRecord
@@ -1261,6 +1306,7 @@ enum JDFinanceHoldingsSyncPlanner {
         )
     }
 
+    /// 由京东转换订单推导转出/转入双方的最终金额、份额、单价与状态，作为转换覆盖写入依据。
     private static func reconciliationValues(
         outRecord: FundTradeRecord,
         inRecord: FundTradeRecord?,
@@ -1281,6 +1327,7 @@ enum JDFinanceHoldingsSyncPlanner {
         )
     }
 
+    /// 计算京东最终值与本地记录之间的金额/份额/单价差额，用于决定“待覆盖”通知。
     private static func recordDifference(
         record: FundTradeRecord,
         values: JDFinanceReconciliationValues
@@ -1292,24 +1339,28 @@ enum JDFinanceHoldingsSyncPlanner {
         )
     }
 
+    /// 计算京东与本地金额差额（四舍五入至分，差异不足 0.01 视为无差异）。
     private static func amountDelta(jd: Double?, local: Double?) -> Double? {
         guard let jd, let local else { return nil }
         let delta = roundedMoney(jd) - roundedMoney(local)
         return abs(delta) >= 0.01 ? delta : nil
     }
 
+    /// 计算京东与本地份额差额（四舍五入至 6 位，差异不足阈值视为无差异）。
     private static func sharesDelta(jd: Double?, local: Double?) -> Double? {
         guard let jd, let local else { return nil }
         let delta = roundedShares(jd) - roundedShares(local)
         return abs(delta) >= 0.000001 ? delta : nil
     }
 
+    /// 计算京东与本地单价差额（四舍五入至 6 位，差异不足阈值视为无差异）。
     private static func priceDelta(jd: Double?, local: Double?) -> Double? {
         guard let jd, let local else { return nil }
         let delta = roundedShares(jd) - roundedShares(local)
         return abs(delta) >= 0.000001 ? delta : nil
     }
 
+    /// 由金额与份额反算单价；金额为 0 或份额为 0 时回退到本地已有单价。
     private static func price(amount: Double?, shares: Double?, fallback: Double?) -> Double? {
         guard let amount, let shares, amount > 0, shares > 0 else {
             return fallback
@@ -1317,6 +1368,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return roundedShares(amount / shares)
     }
 
+    /// 构建一条“同步冲突”通知（无法安全匹配京东最终流水时，仅提示不覆盖）。
     private static func conflictNotice(
         record: FundTradeRecord,
         message: String
@@ -1341,6 +1393,7 @@ enum JDFinanceHoldingsSyncPlanner {
         )
     }
 
+    /// 构建一条转换类型的“同步冲突”通知（本地转换记录不完整或金额无法安全匹配时）。
     private static func conversionConflictNotice(
         outRecord: FundTradeRecord,
         inRecord: FundTradeRecord?,
@@ -1369,6 +1422,7 @@ enum JDFinanceHoldingsSyncPlanner {
         )
     }
 
+    /// 判断京东产品是否带有“待确认交易”提示文案（非空即视为有提示）。
     private static func hasPendingTransactionTip(_ product: JDFinanceHoldingProduct) -> Bool {
         product.transactionTipText?.isEmpty == false
     }
@@ -1379,6 +1433,7 @@ enum JDFinanceHoldingsSyncPlanner {
         var action: String
     }
 
+    /// 判断京东待确认买入是否已在本地存在对应待确认交易：比对双方按日期/时段/动作汇总的批次金额，或本地持仓金额已覆盖。
     private static func hasLocalPendingTransaction(
         for product: JDFinanceHoldingProduct,
         localFund: FundPosition?,
@@ -1427,6 +1482,7 @@ enum JDFinanceHoldingsSyncPlanner {
         ) != nil
     }
 
+    /// 把京东产品待确认明细按“日期+时段+动作”汇总成批次金额（买入计金额、卖出/转换计份额）。
     private static func pendingBatchTotals(
         for product: JDFinanceHoldingProduct
     ) -> [PendingBatchKey: Int64] {
@@ -1468,6 +1524,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return totals
     }
 
+    /// 把本地快照中某代码的待确认批次按“日期+时段+动作”汇总（含本地已确认选项，用于与京东批次比对）。
     private static func pendingBatchTotals(
         in snapshot: PortfolioSnapshot,
         tradeRecords: [FundTradeRecord],
@@ -1524,6 +1581,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return totals
     }
 
+    /// 计算京东待确认买入中“已与本地待确认批次匹配”的部分金额，供预览展示应扣减的待确认额。
     private static func reconciledPendingBuyAmount(
         for product: JDFinanceHoldingProduct,
         localSnapshot: PortfolioSnapshot,
@@ -1563,6 +1621,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return Double(pendingCents) / 100
     }
 
+    /// 当本地持仓金额已覆盖京东买入总额、且有对应待确认份额批次时，返回该待确认买入金额（避免重复写入）。
     private static func positionCoveredPendingBuyAmount(
         for product: JDFinanceHoldingProduct,
         localFund: FundPosition?,
@@ -1599,6 +1658,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return pendingBuyAmount
     }
 
+    /// 仅汇总本地仍为 pending 状态的待确认批次（不含已确认），用于判断“金额已覆盖但缺流水”。
     private static func pendingOnlyBatchTotals(
         in snapshot: PortfolioSnapshot,
         tradeRecords: [FundTradeRecord],
@@ -1655,6 +1715,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return totals
     }
 
+    /// 判断一条本地交易是否属于“京东相关的待确认批次”：来源为京东或在等待外部确认，且状态为待确认/等待中/（可选）已确认。
     private static func isJDFinanceTrackedPendingBatchRecord(
         _ record: FundTradeRecord,
         includingLocallyConfirmed: Bool = false
@@ -1673,6 +1734,7 @@ enum JDFinanceHoldingsSyncPlanner {
             || (includingLocallyConfirmed && record.status == .confirmed)
     }
 
+    /// 将本地交易类型映射为待确认批次动作（买入/卖出/转换），转换转入无批次。
     private static func pendingBatchAction(for kind: FundTradeKind) -> JDFinancePendingTradeAction? {
         switch kind {
         case .newFund, .buy:
@@ -1686,6 +1748,7 @@ enum JDFinanceHoldingsSyncPlanner {
         }
     }
 
+    /// 将本地买卖动作映射为待确认批次动作（买/卖）。
     private static func pendingBatchAction(for action: FundTradeAction) -> JDFinancePendingTradeAction {
         switch action {
         case .buy:
@@ -1695,6 +1758,7 @@ enum JDFinanceHoldingsSyncPlanner {
         }
     }
 
+    /// 把单笔待确认按动作归一为可比整数：买入用金额（分），卖出/转换用份额（百万分之一份）。
     private static func pendingBatchValue(
         action: JDFinancePendingTradeAction,
         amount: Double?,
@@ -1712,6 +1776,7 @@ enum JDFinanceHoldingsSyncPlanner {
         }
     }
 
+    /// 把一笔待确认金额累加到对应批次键的汇总表中。
     private static func addPendingBatchValue(
         _ value: Int64,
         date: String,
@@ -1727,6 +1792,7 @@ enum JDFinanceHoldingsSyncPlanner {
         totals[key, default: 0] += value
     }
 
+    /// 决定京东待确认产品可导入为哪种本地待确认类型：新增基金/买入/卖出/转换，无对应本地且为卖出时不可导入。
     private static func pendingImportKind(
         for product: JDFinanceHoldingProduct,
         localFund: FundPosition?,
@@ -1768,6 +1834,7 @@ enum JDFinanceHoldingsSyncPlanner {
         }
     }
 
+    /// 为转换类待确认产品解析目标基金，返回“转换至某代码/名称”的导入类型（按代码或名称匹配本地）。
     private static func conversionImportKind(
         for product: JDFinanceHoldingProduct,
         localFundsByCode: [String: FundPosition],
@@ -1798,6 +1865,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return nil
     }
 
+    /// 返回基金当前持仓金额（仅持有状态）：优先用 currentAmount，否则用本金+收益估算。
     private static func currentAmount(for fund: FundPosition) -> Double? {
         guard fund.status == .holding else {
             return nil
@@ -1813,6 +1881,7 @@ enum JDFinanceHoldingsSyncPlanner {
         return amount > 0 ? amount : nil
     }
 
+    /// 返回基金持仓收益：优先用 holdingIncome，否则用已确认的确认收益。
     private static func holdingIncome(for fund: FundPosition) -> Double? {
         fund.holdingIncome ?? fund.confirmedHoldingIncome
     }

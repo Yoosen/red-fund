@@ -208,7 +208,7 @@ enum PortfolioCalculator {
         guard amount > 0, referenceNetValue > 0 else { return nil }
         let principal = amount - profit
         guard principal > 0 else { return nil }
-        let shares = rounded(amount / referenceNetValue, places: PortfolioPrecision.storedSharePlaces)
+        let shares = rounded(principal / referenceNetValue, places: PortfolioPrecision.storedSharePlaces)
         guard shares > 0 else { return nil }
         let cost = rounded(principal / shares, places: PortfolioPrecision.costPlaces)
         guard cost > 0 else { return nil }

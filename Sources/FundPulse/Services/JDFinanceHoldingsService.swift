@@ -1,33 +1,52 @@
 import Foundation
 
+/// 京东金融持仓数据同步服务。
+/// 负责拉取持仓快照（`fundHoldGroup`）、待确认交易明细（`getNewFundPositionDetail`）
+/// 与交易流水（`queryTradeOrderList`），并将流水与持仓中的「待确认/交易提示」进行
+/// 匹配、去重与合并，产出可用于本地对账的 `JDFinanceHoldingsSnapshot`。
 struct JDFinanceHoldingsService: Sendable {
+    /// 单次交易流水拉取的批次结果：记录集合 + 拉取状态（是否完整）。
     private struct TradeOrderFetchBatch {
         var records: [JDFinanceTradeOrderRecord]
         var state: JDFinanceTradeOrderFetchState
     }
 
+    /// 单页交易流水拉取结果：记录集合 + 是否到达末页。
     private struct TradeOrderPageBatch {
         var records: [JDFinanceTradeOrderRecord]
         var reachedEnd: Bool
     }
 
+    /// 持仓分组接口地址（京东金融网关，用于拉取持仓快照）。
     static let endpoint = URL(string: "https://ms.jr.jd.com/gw/generic/base/h5/m/fundHoldGroup")!
+    /// 持仓待确认明细接口地址（用于补全交易中的份额/金额/时间）。
     static let detailEndpoint = URL(string: "https://ms.jr.jd.com/gw/generic/jj/newna/m/getNewFundPositionDetail")!
+    /// 交易流水接口地址（新版网关，优先使用）。
     static let tradeOrderListEndpoint = URL(
         string: "https://ms.jr.jd.com/gw2/generic/cfGateway/newna/m/queryTradeOrderList"
     )!
+    /// 交易流水接口地址（旧版 h5 网关，作为新版失败时的兜底）。
     static let legacyTradeOrderListEndpoint = URL(
         string: "https://ms.jr.jd.com/gw2/generic/cfGateway/h5/m/queryTradeOrderList"
     )!
 
+    /// 底层网络会话。
     private let session: URLSession
+    /// 可选的网络探测记录器，用于记录每次请求的端点/状态码/响应。
     private let networkProbe: JDFinanceNetworkProbe?
 
+    /// 初始化：可注入自定义 `URLSession` 与网络探测器。
     init(session: URLSession = .shared, networkProbe: JDFinanceNetworkProbe? = nil) {
         self.session = session
         self.networkProbe = networkProbe
     }
 
+    /// 拉取京东持仓快照。
+    /// - Parameters:
+    ///   - cookieHeader: 京东登录 Cookie；为空时只返回持仓基础信息。
+    ///   - needsTradeOrderRecords: 是否需要把交易流水用于「对账候选」。
+    ///   - tradeOrderStartDate: 交易流水查询的起始日期（默认近 90 天）。
+    /// 返回解析后的持仓快照，并视情况补全待确认明细与交易流水。
     func fetchSnapshot(
         cookieHeader: String?,
         needsTradeOrderRecords: Bool = false,
@@ -91,6 +110,9 @@ struct JDFinanceHoldingsService: Sendable {
         }
     }
 
+    /// 为持仓产品补全「待确认交易明细」。
+    /// 优先用产品自带的 `detailRequest` 拉取明细；若产品存在交易提示，
+    /// 则进一步用匹配到的交易流水合并出更完整的待确认信息。
     private func productsByFillingPendingDetails(
         for products: [JDFinanceHoldingProduct],
         cookieHeader: String,
@@ -133,6 +155,8 @@ struct JDFinanceHoldingsService: Sendable {
         return enrichedProducts
     }
 
+    /// 拉取交易流水：先拉全局流水，再为存在交易提示的持仓产品补充拉取，
+    /// 最后解析转换目标基金代码（按名称在线查询补全）。
     private func tradeOrderRecords(
         for products: [JDFinanceHoldingProduct],
         cookieHeader: String,
@@ -184,6 +208,8 @@ struct JDFinanceHoldingsService: Sendable {
         )
     }
 
+    /// 为「转换」类流水补全目标基金代码：当流水只有目标基金名称时，
+    /// 通过行情服务按名称查询基金代码并回填（带缓存以避免重复请求）。
     private func recordsByResolvingConversionTargets(_ records: [JDFinanceTradeOrderRecord]) async -> [JDFinanceTradeOrderRecord] {
         let quoteService = FundQuoteService(session: session)
         var cache: [String: String?] = [:]
@@ -212,6 +238,7 @@ struct JDFinanceHoldingsService: Sendable {
         return result
     }
 
+    /// 拉取单个产品的待确认交易明细（持仓详情接口）。
     private func fetchPendingDetail(
         _ detailRequest: JDFinanceHoldingDetailRequest,
         cookieHeader: String
@@ -256,6 +283,9 @@ struct JDFinanceHoldingsService: Sendable {
         return try JDFinanceHoldingDetailParser.parse(data: data)
     }
 
+    /// 拉取交易流水（按产品可选）。
+    /// 依次尝试新版/旧版两个网关端点，任一成功即采用；
+    /// 兼容「原生别名登录失败但旧版成功」的场景，避免误报告警。
     private func fetchTradeOrderRecords(
         for product: JDFinanceHoldingProduct? = nil,
         cookieHeader: String,
@@ -323,6 +353,7 @@ struct JDFinanceHoldingsService: Sendable {
         throw firstError ?? JDFinanceHoldingsError.network("京东交易记录接口请求失败")
     }
 
+    /// 从指定端点分页拉取交易流水，直到某页为空或达到页上限。
     private func fetchTradeOrderRecords(
         from endpoint: URL,
         product: JDFinanceHoldingProduct?,
@@ -347,6 +378,7 @@ struct JDFinanceHoldingsService: Sendable {
         return TradeOrderPageBatch(records: records, reachedEnd: false)
     }
 
+    /// 拉取交易流水单页：POST 表单请求，解析响应为交易记录数组。
     private func fetchTradeOrderRecords(
         from endpoint: URL,
         page: Int,
@@ -385,6 +417,7 @@ struct JDFinanceHoldingsService: Sendable {
         return try JDFinanceTradeOrderParser.parse(data: data)
     }
 
+    /// 按「稳定订单键」去重交易流水；无稳定键的记录直接保留。
     private static func deduplicatedTradeOrderRecords(_ records: [JDFinanceTradeOrderRecord]) -> [JDFinanceTradeOrderRecord] {
         var seenStableKeys = Set<String>()
         var result: [JDFinanceTradeOrderRecord] = []
@@ -407,6 +440,9 @@ struct JDFinanceHoldingsService: Sendable {
     /// happen to share the same visible fields. Stable order keys are unique. For
     /// records without an order ID, retain the largest occurrence count returned by
     /// any one source instead of summing copies from new/legacy or global/product APIs.
+    /// 将新来源流水合并进已有记录：有稳定键的按键去重，
+    /// 无稳定键的按多字段指纹去重，并对同款「无订单号」的流水取最大出现次数，
+    /// 避免新旧/全局/产品接口重复计数。
     private static func mergeTradeOrderRecords(
         _ incomingRecords: [JDFinanceTradeOrderRecord],
         into records: inout [JDFinanceTradeOrderRecord]
@@ -443,11 +479,12 @@ struct JDFinanceHoldingsService: Sendable {
         }
     }
 
+    /// 生成交易流水去重指纹：优先用稳定订单键，否则用多字段拼接。
     private static func tradeOrderRecordDedupeKey(_ record: JDFinanceTradeOrderRecord) -> String {
         if let stableOrderKey = record.stableOrderKey, !stableOrderKey.isEmpty {
             return stableOrderKey
         }
-        return [
+        let keyComponents: [String] = [
             record.code ?? "",
             record.productName ?? "",
             record.conversionTargetCode ?? "",
@@ -460,9 +497,11 @@ struct JDFinanceHoldingsService: Sendable {
             record.submittedAt ?? "",
             record.effectiveStatus.rawValue,
             record.statusText ?? ""
-        ].joined(separator: "|")
+        ]
+        return keyComponents.joined(separator: "|")
     }
 
+    /// 将单键值序列化为 `application/x-www-form-urlencoded` 的请求体。
     private static func formEncodedBody(name: String, value: String) -> Data? {
         var components = URLComponents()
         components.queryItems = [
@@ -471,6 +510,8 @@ struct JDFinanceHoldingsService: Sendable {
         return components.percentEncodedQuery?.data(using: .utf8)
     }
 
+    /// 构造交易流水查询请求体（JSON 字符串）。
+    /// 含分页、业务类型、查询时间范围；指定产品时附带产品/SKU/基金代码。
     static func tradeOrderRequestPayload(
         page: Int,
         now: Date = .now,
@@ -506,6 +547,7 @@ struct JDFinanceHoldingsService: Sendable {
         return payload
     }
 
+    /// 构造交易流水接口所需的 `Referer` 头（全局列表页或产品详情页）。
     private static func tradeOrderReferer(for product: JDFinanceHoldingProduct?) -> String {
         guard let product else {
             return "https://roma.jd.com/wealth/tradeorder/list?pageShowType=1&businessCode=FUND&pageShowTitle=%E5%9F%BA%E9%87%91%E4%BA%A4%E6%98%93"
@@ -532,6 +574,7 @@ struct JDFinanceHoldingsService: Sendable {
             ?? "https://roma.jd.com/wealth/tradeorder/list?pageShowType=1&businessCode=FUND"
     }
 
+    /// 计算交易流水查询的起止日期：优先用传入起始日期，否则回退到近 90 天。
     private static func tradeOrderDateRange(now: Date, startDate: String?) -> (start: String, end: String) {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
@@ -543,6 +586,8 @@ struct JDFinanceHoldingsService: Sendable {
         )
     }
 
+    /// 为持仓产品的交易提示寻找匹配的交易流水。
+    /// 按「金额+笔数」多种组合策略逐层尝试，返回能唯一确定的一批记录。
     private static func matchingTradeOrderRecords(
         for product: JDFinanceHoldingProduct,
         in records: [JDFinanceTradeOrderRecord]
@@ -621,6 +666,7 @@ struct JDFinanceHoldingsService: Sendable {
         return nil
     }
 
+    /// 取与产品同基金同方向、作为「对账候选」的前若干条流水。
     private static func candidateTradeOrderRecords(
         for product: JDFinanceHoldingProduct,
         in records: [JDFinanceTradeOrderRecord]
@@ -632,6 +678,7 @@ struct JDFinanceHoldingsService: Sendable {
         return Array(candidates.prefix(6))
     }
 
+    /// 当交易提示无匹配流水时，生成一段可读的状态说明，描述已查到/未查到的原因。
     private static func unmatchedTradeOrderStatus(
         for product: JDFinanceHoldingProduct,
         in records: [JDFinanceTradeOrderRecord]
@@ -676,6 +723,7 @@ struct JDFinanceHoldingsService: Sendable {
         return "已查交易记录，未匹配到可用交易时间"
     }
 
+    /// 判断流水与持仓产品是否同一基金：优先比对基金代码，否则按规范化名称（含包含关系）匹配。
     private static func matchesIdentity(_ record: JDFinanceTradeOrderRecord, product: JDFinanceHoldingProduct) -> Bool {
         if product.isCodeResolved, let code = record.code, code == product.code {
             return true
@@ -697,6 +745,7 @@ struct JDFinanceHoldingsService: Sendable {
             && (canonicalRecordName.contains(canonicalProductName) || canonicalProductName.contains(canonicalRecordName))
     }
 
+    /// 判断流水交易方向与产品期望方向是否一致（未知方向视为兼容）。
     private static func matchesAction(_ record: JDFinanceTradeOrderRecord, product: JDFinanceHoldingProduct) -> Bool {
         let expectedAction = product.pendingDetail?.action ?? product.transactionTip?.action
         guard let expectedAction, expectedAction != .unknown else {
@@ -708,6 +757,7 @@ struct JDFinanceHoldingsService: Sendable {
         return recordAction == expectedAction
     }
 
+    /// 判断流水金额与产品期望金额是否一致（误差 < 0.01）。
     private static func matchesAmount(_ record: JDFinanceTradeOrderRecord, product: JDFinanceHoldingProduct) -> Bool {
         let expectedAmount = product.transactionTip?.totalAmount ?? product.pendingDetail?.amount
         guard let expectedAmount else { return true }
@@ -715,10 +765,12 @@ struct JDFinanceHoldingsService: Sendable {
         return abs(amount - expectedAmount) < 0.01
     }
 
+    /// 判断流水是否为可用状态（排除已取消/失败）。
     private static func matchesUsableStatus(_ record: JDFinanceTradeOrderRecord) -> Bool {
         record.effectiveStatus != .cancelled && record.effectiveStatus != .failed
     }
 
+    /// 在按交易日+时段分组的流水中，寻找金额/笔数唯一匹配的一组。
     private static func matchingTradeOrderRecordGroup(
         in records: [JDFinanceTradeOrderRecord],
         expectedAmount: Double,
@@ -735,6 +787,7 @@ struct JDFinanceHoldingsService: Sendable {
         return matches.count == 1 ? matches[0] : nil
     }
 
+    /// 在流水中寻找金额唯一匹配的单条聚合记录。
     private static func matchingAggregateTradeOrderRecord(
         in records: [JDFinanceTradeOrderRecord],
         expectedAmount: Double
@@ -746,6 +799,7 @@ struct JDFinanceHoldingsService: Sendable {
         return uniqueAmountMatchedTradeOrder(in: amountMatches)
     }
 
+    /// 从金额匹配的流水中挑出唯一一条；若存在「处理中」订单则优先它而非历史已完成订单。
     private static func uniqueAmountMatchedTradeOrder(
         in records: [JDFinanceTradeOrderRecord]
     ) -> JDFinanceTradeOrderRecord? {
@@ -760,6 +814,7 @@ struct JDFinanceHoldingsService: Sendable {
         return pendingRecords.count == 1 ? pendingRecords.first : nil
     }
 
+    /// 在未按时间分组的流水中，按金额/笔数寻找唯一匹配的若干条。
     private static func matchingUngroupedTradeOrderRecords(
         in records: [JDFinanceTradeOrderRecord],
         expectedAmount: Double,
@@ -772,6 +827,7 @@ struct JDFinanceHoldingsService: Sendable {
         )
     }
 
+    /// 仅按笔数匹配：寻找同时间分组恰好等于期望笔数、或整体等于期望笔数的一批记录。
     private static func matchingTradeOrderRecordsByCount(
         in records: [JDFinanceTradeOrderRecord],
         expectedCount: Int
@@ -793,6 +849,7 @@ struct JDFinanceHoldingsService: Sendable {
         var records: [JDFinanceTradeOrderRecord]
     }
 
+    /// 将流水按「交易日 + 交易时段」分组，便于同组匹配。
     private static func recordsGroupedByTradeTiming(_ records: [JDFinanceTradeOrderRecord]) -> [TradeTimingGroup] {
         var groups: [TradeTimingGroup] = []
 
@@ -813,6 +870,7 @@ struct JDFinanceHoldingsService: Sendable {
         return groups
     }
 
+    /// 在流水中寻找金额组合数唯一等于期望金额+笔数的一组（用于多笔合计匹配）。
     private static func matchingAmountSubset(
         in records: [JDFinanceTradeOrderRecord],
         expectedAmount: Double,
@@ -840,6 +898,7 @@ struct JDFinanceHoldingsService: Sendable {
         return matches.count == 1 ? matches[0] : nil
     }
 
+    /// 回溯枚举流水的金额组合，收集所有金额/笔数均符合期望的子集（最多保留 2 组用于判定唯一性）。
     private static func collectAmountSubsets(
         in records: [JDFinanceTradeOrderRecord],
         startIndex: Int,
@@ -882,6 +941,7 @@ struct JDFinanceHoldingsService: Sendable {
         }
     }
 
+    /// 将匹配到的多条交易流水合并进待确认明细：汇总金额/份额、统一交易日与时段、生成状态文案。
     private static func mergedPendingDetail(
         _ detail: JDFinancePendingTransactionDetail?,
         with records: [JDFinanceTradeOrderRecord],
@@ -904,6 +964,7 @@ struct JDFinanceHoldingsService: Sendable {
         )
     }
 
+    /// 在无法匹配流水时，基于产品交易提示与状态文案构造占位待确认明细（附带候选流水）。
     private static func pendingDetail(
         _ detail: JDFinancePendingTransactionDetail?,
         product: JDFinanceHoldingProduct,
@@ -923,6 +984,7 @@ struct JDFinanceHoldingsService: Sendable {
         )
     }
 
+    /// 计算待确认明细金额：多笔流水取提示总额/汇总值，单笔取明细/流水/提示优先级。
     private static func detailAmount(
         _ detail: JDFinancePendingTransactionDetail?,
         product: JDFinanceHoldingProduct,
@@ -935,18 +997,21 @@ struct JDFinanceHoldingsService: Sendable {
         return detail?.amount ?? records.first?.amount ?? product.transactionTip?.totalAmount
     }
 
+    /// 汇总流水金额（任一缺失则返回 nil）。
     private static func summedAmount(_ records: [JDFinanceTradeOrderRecord]) -> Double? {
         let amounts = records.compactMap(\.amount)
         guard amounts.count == records.count else { return nil }
         return amounts.reduce(0, +)
     }
 
+    /// 汇总流水份额（任一缺失则返回 nil）。
     private static func summedShares(_ records: [JDFinanceTradeOrderRecord]) -> Double? {
         let shares = records.compactMap(\.shares)
         guard !shares.isEmpty, shares.count == records.count else { return nil }
         return shares.reduce(0, +)
     }
 
+    /// 若数组中所有值一致则返回该值，否则返回 nil。
     private static func commonValue<Value: Hashable>(_ values: [Value]) -> Value? {
         guard let first = values.first,
               values.allSatisfy({ $0 == first })
@@ -956,6 +1021,7 @@ struct JDFinanceHoldingsService: Sendable {
         return first
     }
 
+    /// 为多笔匹配流水生成聚合状态文案（含笔数、交易日与时段）。
     private static func aggregateStatusText(for records: [JDFinanceTradeOrderRecord]) -> String? {
         guard records.count > 1 else {
             return records.first?.statusText
@@ -970,6 +1036,7 @@ struct JDFinanceHoldingsService: Sendable {
         return "匹配交易记录：\(records.count) 笔"
     }
 
+    /// 规范化基金名称：去空格、转小写，便于模糊匹配。
     private static func normalizedFundName(_ value: String) -> String {
         value
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -977,6 +1044,7 @@ struct JDFinanceHoldingsService: Sendable {
             .lowercased()
     }
 
+    /// 规范化基金名称（去除「中证/转换/转入/转出」等前缀），用于较长名称的包含匹配。
     private static func canonicalFundName(_ value: String) -> String {
         normalizedFundName(value)
             .replacingOccurrences(of: "中证", with: "")
@@ -985,12 +1053,15 @@ struct JDFinanceHoldingsService: Sendable {
             .replacingOccurrences(of: "转出-", with: "")
     }
 
+    /// 持仓分组接口的固定请求体（JSON 字符串）。
     private static let requestPayload = """
     {"clientVersion":"","clientType":"android","apiVersion":1,"appChannel":"fund_jjcc","sortKey":"1","sortDirection":"DESC","extParams":{"channelCode":"outside"}}
     """
 }
 
+/// 解析京东持仓快照接口（`fundHoldGroup`）的 JSON 响应，产出 `JDFinanceHoldingsSnapshot`。
 enum JDFinanceHoldingsParser {
+    /// 解析整个持仓快照：校验登录态、提取总资产/收益、遍历产品列表。
     static func parse(data: Data) throws -> JDFinanceHoldingsSnapshot {
         let object: Any
         do {
@@ -1037,6 +1108,7 @@ enum JDFinanceHoldingsParser {
         )
     }
 
+    /// 检测响应中的登录失效标记（resultCode=3 或提示请先登录），抛出 `notLoggedIn`。
     private static func validateLoginState(in dictionary: [String: Any]) throws {
         let resultCode = stringValue(dictionary["resultCode"])
         let resultMessage = stringValue(dictionary["resultMsg"]) ?? ""
@@ -1045,6 +1117,7 @@ enum JDFinanceHoldingsParser {
         }
     }
 
+    /// 解析单个持仓产品：提取 SKU、名称、金额、收益、交易提示与详情请求。
     private static func parseProduct(_ dictionary: [String: Any]) -> JDFinanceHoldingProduct? {
         guard let skuID = stringValue(dictionary["skuId"] ?? dictionary["skuID"] ?? dictionary["sku"]),
               let name = stringValue(dictionary["productName"] ?? dictionary["name"]),
@@ -1071,6 +1144,7 @@ enum JDFinanceHoldingsParser {
         )
     }
 
+    /// 解析「交易提示」文本，提取交易方向、笔数、合计金额。
     private static func parseTransactionTip(_ value: Any?) -> JDFinanceTransactionTip? {
         guard let text = stringValue(value) else { return nil }
         return JDFinanceTransactionTip(
@@ -1081,6 +1155,7 @@ enum JDFinanceHoldingsParser {
         )
     }
 
+    /// 从字典中提取持仓详情请求所需的 `extJson`。
     private static func parseDetailRequest(in dictionary: [String: Any]) -> JDFinanceHoldingDetailRequest? {
         guard let extJSON = nestedStringValue(forKey: "extJson", in: dictionary) else {
             return nil
@@ -1088,6 +1163,7 @@ enum JDFinanceHoldingsParser {
         return JDFinanceHoldingDetailRequest(extJSON: extJSON)
     }
 
+    /// 在嵌套字典/数组中递归查找指定键（不区分大小写）对应的字符串值。
     private static func nestedStringValue(forKey targetKey: String, in value: Any?) -> String? {
         if let dictionary = value as? [String: Any] {
             for (key, value) in dictionary where key.caseInsensitiveCompare(targetKey) == .orderedSame {
@@ -1113,6 +1189,7 @@ enum JDFinanceHoldingsParser {
         return nil
     }
 
+    /// 从多个可能的字段名（含嵌套）中提取显式基金代码（6 位数字）。
     private static func explicitFundCode(in dictionary: [String: Any]) -> String? {
         let explicitCodeKeys = [
             "fundCode",
@@ -1133,8 +1210,9 @@ enum JDFinanceHoldingsParser {
             }
         }
 
-        for value in dictionary.values {
-            if let nested = value as? [String: Any],
+        // 按键名排序后递归，保证同一份数据每次提取结果一致（字典遍历顺序本身不稳定）。
+        for key in dictionary.keys.sorted() {
+            if let nested = dictionary[key] as? [String: Any],
                let code = explicitFundCode(in: nested)
             {
                 return code
@@ -1144,13 +1222,15 @@ enum JDFinanceHoldingsParser {
         return nil
     }
 
+    /// 将任意值规范化为 6 位纯数字基金代码，否则返回 nil。
     private static func normalizedFundCode(from value: Any?) -> String? {
         guard let rawValue = stringValue(value) else { return nil }
-        let digits = rawValue.filter(\.isNumber)
-        guard digits.count == 6 else { return nil }
-        return digits
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count == 6, trimmed.allSatisfy(\.isNumber) else { return nil }
+        return trimmed
     }
 
+    /// 将 JSON 中的任意值（字符串/数字/嵌套字典）尽力转换为字符串。
     private static func stringValue(_ value: Any?) -> String? {
         switch value {
         case let value as String:
@@ -1168,11 +1248,13 @@ enum JDFinanceHoldingsParser {
         }
     }
 
+    /// 当字段非数值时返回其文本（用于收益提示语等）。
     private static func noticeTextValue(_ value: Any?) -> String? {
         guard numericValue(value) == nil else { return nil }
         return stringValue(value)
     }
 
+    /// 将 JSON 中的任意值（数字/字符串/嵌套字典）尽力转换为 `Double`。
     private static func numericValue(_ value: Any?) -> Double? {
         switch value {
         case let value as Double:
@@ -1194,6 +1276,7 @@ enum JDFinanceHoldingsParser {
         }
     }
 
+    /// 清洗字符串（去逗号/百分号/加号）后解析为 `Double`，空或 `--` 返回 nil。
     private static func parseNumber(_ value: String) -> Double? {
         let normalized = value
             .replacingOccurrences(of: ",", with: "")
@@ -1209,6 +1292,7 @@ enum JDFinanceHoldingsParser {
         return Double(normalized)
     }
 
+    /// 从交易提示文本推断交易方向（转换/买入/卖出/未知）。
     private static func pendingTradeAction(from text: String) -> JDFinancePendingTradeAction {
         if text.contains("转换") || text.contains("转入") || text.contains("转出") {
             return .conversion
@@ -1222,6 +1306,7 @@ enum JDFinanceHoldingsParser {
         return .unknown
     }
 
+    /// 从交易提示文本中正则提取「合计 X 元」或「X 元」形式的金额。
     private static func transactionTotalAmount(from text: String) -> Double? {
         if let value = regexString(pattern: #"合计\s*([+-]?[0-9][0-9,]*(?:\.[0-9]+)?)\s*元"#, in: text) {
             return parseNumber(value)
@@ -1232,10 +1317,12 @@ enum JDFinanceHoldingsParser {
         return nil
     }
 
+    /// 正则提取第一个捕获组并转为 `Int`。
     private static func regexInt(pattern: String, in text: String) -> Int? {
         regexString(pattern: pattern, in: text).flatMap(Int.init)
     }
 
+    /// 正则提取第一个捕获组的子串。
     private static func regexString(pattern: String, in text: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -1249,12 +1336,16 @@ enum JDFinanceHoldingsParser {
     }
 }
 
+/// 解析京东持仓「待确认交易明细」接口（`getNewFundPositionDetail`）的 JSON 响应。
+/// 采用「叶子节点遍历」策略：把任意嵌套 JSON 拍平为 (路径, 文本) 列表，再按路径关键词与文本特征提取字段。
 private enum JDFinanceHoldingDetailParser {
+    /// 拍平后的叶子节点：记录字段路径与文本值。
     private struct Leaf {
         var path: String
         var value: String
     }
 
+    /// 解析待确认交易明细：校验登录态后，从叶子节点提取方向/金额/份额/交易日/时段/状态。
     static func parse(data: Data) throws -> JDFinancePendingTransactionDetail {
         let object: Any
         do {
@@ -1283,6 +1374,7 @@ private enum JDFinanceHoldingDetailParser {
         )
     }
 
+    /// 检测响应中的登录失效标记（resultCode=3 或提示请先登录），抛出 `notLoggedIn`。
     private static func validateLoginState(in dictionary: [String: Any]) throws {
         let resultCode = stringValue(dictionary["resultCode"])
         let resultMessage = stringValue(dictionary["resultMsg"]) ?? ""
@@ -1291,6 +1383,7 @@ private enum JDFinanceHoldingDetailParser {
         }
     }
 
+    /// 从叶子节点中按路径关键词优先级推断交易方向（转换/买入/卖出）。
     private static func parseAction(from leaves: [Leaf]) -> JDFinancePendingTradeAction? {
         let preferredLeaves = leaves.sorted { lhs, rhs in
             score(lhs.path, keywords: ["action", "type", "trade", "order", "status", "state"]) >
@@ -1312,6 +1405,7 @@ private enum JDFinanceHoldingDetailParser {
         return nil
     }
 
+    /// 从叶子节点提取交易金额：优先匹配金额相关路径，否则匹配含「金额/合计/元」的文本。
     private static func parseAmount(from leaves: [Leaf]) -> Double? {
         let preferred = leaves
             .filter { leaf in
@@ -1338,6 +1432,7 @@ private enum JDFinanceHoldingDetailParser {
         return nil
     }
 
+    /// 从叶子节点提取交易份额（匹配 share/份额 相关路径或文本）。
     private static func parseShares(from leaves: [Leaf]) -> Double? {
         let preferred = leaves.filter { leaf in
             let path = leaf.path.lowercased()
@@ -1359,6 +1454,7 @@ private enum JDFinanceHoldingDetailParser {
         return nil
     }
 
+    /// 从叶子节点提取交易日（排除「预计」类文案，按路径关键词排序挑选）。
     private static func parseTradeDate(from leaves: [Leaf]) -> String? {
         let preferred = leaves.filter(isTradeTimingCandidate).sorted { lhs, rhs in
             score(lhs.path, keywords: ["trade", "apply", "order", "date", "time"]) >
@@ -1375,6 +1471,7 @@ private enum JDFinanceHoldingDetailParser {
         return nil
     }
 
+    /// 从叶子节点提取交易时段（15:00 前/后），按路径关键词排序挑选。
     private static func parseTradeTimeType(from leaves: [Leaf]) -> PositionTimeType? {
         let preferred = leaves.filter(isTradeTimingCandidate).sorted { lhs, rhs in
             score(lhs.path, keywords: ["trade", "apply", "order", "time", "date"]) >
@@ -1390,6 +1487,8 @@ private enum JDFinanceHoldingDetailParser {
         return nil
     }
 
+    /// 判断某个叶子节点是否为「交易时间」相关字段（按路径/文本关键词过滤）。
+    /// 判断某个叶子节点是否为「交易时间」相关字段（按路径/文本关键词过滤）。
     private static func isTradeTimingCandidate(_ leaf: Leaf) -> Bool {
         let path = leaf.path.lowercased()
         let positivePathTokens = ["trade", "apply", "order", "accept", "create", "deal", "entrust", "submit", "business"]
@@ -1406,6 +1505,7 @@ private enum JDFinanceHoldingDetailParser {
         return (hasPositivePath || hasTradeTimingText) && !hasNegativePath && !leaf.value.contains("预计")
     }
 
+    /// 从叶子节点提取交易状态文案（确认中/交易中/处理中等）。
     private static func parseStatusText(from leaves: [Leaf]) -> String? {
         let statusLeaves = leaves.filter { leaf in
             let path = leaf.path.lowercased()
@@ -1421,6 +1521,8 @@ private enum JDFinanceHoldingDetailParser {
         }?.value
     }
 
+    /// 将任意嵌套 JSON 递归拍平为 (路径, 文本) 叶子节点列表，便于后续按路径提取。
+    /// 将任意嵌套 JSON 递归拍平为 (路径, 文本) 叶子节点列表，便于后续按路径提取。
     private static func leafValues(in value: Any, path: String = "") -> [Leaf] {
         if let dictionary = value as? [String: Any] {
             return dictionary.flatMap { key, value in
@@ -1438,6 +1540,8 @@ private enum JDFinanceHoldingDetailParser {
         return [Leaf(path: path, value: text)]
     }
 
+    /// 从文本中按多种日期格式归一化为 `yyyy-MM-dd` 字符串。
+    /// 从文本中按多种日期格式归一化为 `yyyy-MM-dd` 字符串。
     private static func normalizedDate(from text: String) -> String? {
         let patterns = [
             #"(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})"#,
@@ -1474,6 +1578,7 @@ private enum JDFinanceHoldingDetailParser {
         return nil
     }
 
+    /// 从文本中按「15:00 前/后」等表述识别交易时段。
     private static func explicitTimeType(from text: String) -> PositionTimeType? {
         let normalized = text.replacingOccurrences(of: "：", with: ":")
         if normalized.contains("15:00前")
@@ -1495,6 +1600,7 @@ private enum JDFinanceHoldingDetailParser {
         return nil
     }
 
+    /// 从文本中的时钟时间（如 14:30）推断交易时段（15:00 前/后）。
     private static func clockTimeType(from text: String) -> PositionTimeType? {
         let normalized = text.replacingOccurrences(of: "：", with: ":")
         let hourText = regexCaptures(pattern: #"\b([01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\b"#, in: normalized)?.first
@@ -1507,6 +1613,7 @@ private enum JDFinanceHoldingDetailParser {
         return hour < 15 ? .before15 : .after15
     }
 
+    /// 计算文本对给定关键词的命中数（用于字段路径优先级排序）。
     private static func score(_ value: String, keywords: [String]) -> Int {
         let lowercased = value.lowercased()
         return keywords.reduce(0) { total, keyword in
@@ -1514,6 +1621,7 @@ private enum JDFinanceHoldingDetailParser {
         }
     }
 
+    /// 将 JSON 中的任意值（字符串/数字/嵌套字典）尽力转换为字符串。
     private static func stringValue(_ value: Any?) -> String? {
         switch value {
         case let value as String:
@@ -1531,6 +1639,7 @@ private enum JDFinanceHoldingDetailParser {
         }
     }
 
+    /// 将金额文本清洗后解析为 `Double`（用于持仓明细中的数值字段）。
     private static func numericValue(_ value: String) -> Double? {
         let match = regexCaptures(pattern: #"([+-]?[0-9][0-9,]*(?:\.[0-9]+)?)"#, in: value)?.first ?? value
         let normalized = match
@@ -1547,6 +1656,7 @@ private enum JDFinanceHoldingDetailParser {
         return Double(normalized)
     }
 
+    /// 正则提取所有捕获组（跳过第 0 组整体匹配），返回子串数组。
     private static func regexCaptures(pattern: String, in text: String) -> [String]? {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -1565,12 +1675,15 @@ private enum JDFinanceHoldingDetailParser {
     }
 }
 
+/// 解析京东交易流水接口（`queryTradeOrderList`）的 JSON 响应，产出 `JDFinanceTradeOrderRecord` 数组。
 enum JDFinanceTradeOrderParser {
+    /// 拍平后的叶子节点：字段路径与文本值。
     private struct Leaf {
         var path: String
         var value: String
     }
 
+    /// 交易金额字段候选键名（用于从流水字典中提取金额）。
     private static let tradeAmountKeys = [
         "allAmount",
         "amount",
@@ -1588,6 +1701,7 @@ enum JDFinanceTradeOrderParser {
         "tradeAmountText"
     ]
 
+    /// 解析交易流水响应：校验登录态后，遍历所有流水行并解析为记录数组。
     static func parse(data: Data) throws -> [JDFinanceTradeOrderRecord] {
         let object: Any
         do {
@@ -1603,6 +1717,7 @@ enum JDFinanceTradeOrderParser {
         return tradeOrderRows(in: object).compactMap(parseRecord)
     }
 
+    /// 检测响应中的登录失效标记（resultCode=3 或提示请先登录），抛出 `notLoggedIn`。
     private static func validateLoginState(in dictionary: [String: Any]) throws {
         let resultCode = stringValue(dictionary["resultCode"])
         let resultMessage = stringValue(dictionary["resultMsg"]) ?? ""
@@ -1611,6 +1726,7 @@ enum JDFinanceTradeOrderParser {
         }
     }
 
+    /// 在任意嵌套 JSON 中递归查找交易流水行（支持 `tradeOrderVoList`/对象/数组/字符串包装）。
     private static func tradeOrderRows(in value: Any) -> [[String: Any]] {
         if let dictionary = value as? [String: Any] {
             if let rows = dictionary["tradeOrderVoList"] as? [[String: Any]] {
@@ -1635,6 +1751,7 @@ enum JDFinanceTradeOrderParser {
         return []
     }
 
+    /// 判断一个字典是否为交易流水行（具备基金身份且金额/时间/类型/状态之一）。
     private static func isTradeOrderRow(_ dictionary: [String: Any]) -> Bool {
         let hasIdentity = explicitFundCode(in: dictionary) != nil
             || firstStringValue(
@@ -1655,6 +1772,7 @@ enum JDFinanceTradeOrderParser {
         return hasIdentity && (hasAmount || hasTiming || hasTradeType || hasStatus)
     }
 
+    /// 解析单条交易流水行：提取基金代码/名称/方向/金额/份额/时间/状态并构造记录。
     private static func parseRecord(_ dictionary: [String: Any]) -> JDFinanceTradeOrderRecord? {
         let timing = parseTradeTiming(in: dictionary)
         let submittedAt = parseSubmittedAt(in: dictionary)
@@ -1717,6 +1835,7 @@ enum JDFinanceTradeOrderParser {
         )
     }
 
+    /// 从流水字典的多个类型/状态字段中推断交易方向（转换/买入/卖出/未知）。
     private static func parseAction(in dictionary: [String: Any]) -> JDFinancePendingTradeAction? {
         let candidates = [
             stringValue(dictionary["tradeTypeName"]),
@@ -1763,6 +1882,7 @@ enum JDFinanceTradeOrderParser {
         return .unknown
     }
 
+    /// 从流水字典中提取交易日与交易时段：优先完整时间戳，否则回退日期或时段。
     private static func parseTradeTiming(in dictionary: [String: Any]) -> (date: String, timeType: PositionTimeType?)? {
         let preferredLeaves = leafValues(in: dictionary).filter(isTradeTimingCandidate).sorted { lhs, rhs in
             score(lhs.path, keywords: ["biztime", "trade", "apply", "order", "create", "time"]) >
@@ -1790,6 +1910,7 @@ enum JDFinanceTradeOrderParser {
         return nil
     }
 
+    /// 从流水字典中提取提交时间（下单/受理时间），归一化为标准时间戳文本。
     private static func parseSubmittedAt(in dictionary: [String: Any]) -> String? {
         let preferredLeaves = leafValues(in: dictionary).filter(isTradeTimingCandidate).sorted { lhs, rhs in
             score(lhs.path, keywords: ["biztime", "trade", "apply", "order", "create", "submit", "time"]) >
@@ -1798,6 +1919,7 @@ enum JDFinanceTradeOrderParser {
         return preferredLeaves.lazy.compactMap { normalizedFullTimestamp(from: $0.value) }.first
     }
 
+    /// 判断某个叶子节点是否为「交易时间」相关字段（按路径/文本关键词过滤）。
     private static func isTradeTimingCandidate(_ leaf: Leaf) -> Bool {
         let path = leaf.path.lowercased()
         let positivePathTokens = [
@@ -1833,6 +1955,7 @@ enum JDFinanceTradeOrderParser {
             && !leaf.value.contains("预计")
     }
 
+    /// 从多个可能的字段名（含嵌套）中提取显式基金代码（6 位数字）。
     private static func explicitFundCode(in dictionary: [String: Any]) -> String? {
         let explicitCodeKeys = [
             "fundCode",
@@ -1853,6 +1976,7 @@ enum JDFinanceTradeOrderParser {
         return nil
     }
 
+    /// 从流水字典中提取「转换目标」基金代码（卖出/目标基金相关键名）。
     private static func conversionTargetFundCode(in dictionary: [String: Any]) -> String? {
         let explicitCodeKeys = [
             "sellFundCode",
@@ -1870,6 +1994,7 @@ enum JDFinanceTradeOrderParser {
         return nil
     }
 
+    /// 将任意值规范化为 6 位纯数字基金代码，否则返回 nil。
     private static func normalizedFundCode(from value: Any?) -> String? {
         guard let rawValue = stringValue(value) else { return nil }
         let digits = rawValue.filter(\.isNumber)
@@ -1877,6 +2002,7 @@ enum JDFinanceTradeOrderParser {
         return digits
     }
 
+    /// 将任意嵌套 JSON 递归拍平为 (路径, 文本) 叶子节点列表，便于后续按路径提取。
     private static func leafValues(in value: Any, path: String = "") -> [Leaf] {
         if let dictionary = value as? [String: Any] {
             return dictionary.flatMap { key, value in
@@ -1894,6 +2020,7 @@ enum JDFinanceTradeOrderParser {
         return [Leaf(path: path, value: text)]
     }
 
+    /// 归一化时间戳/日期文本为 (日期, 时段) 组合：优先完整时间，否则仅日期。
     private static func normalizedDateAndTime(from value: String) -> (date: String, timeType: PositionTimeType?)? {
         let normalizedText: String
         if let timestampText = normalizedTimestampText(from: value) {
@@ -1908,6 +2035,7 @@ enum JDFinanceTradeOrderParser {
         return (date, explicitTimeType(from: normalizedText) ?? clockTimeType(from: normalizedText))
     }
 
+    /// 将 10/13 位 Unix 时间戳文本归一化为标准日期时间字符串。
     private static func normalizedTimestampText(from text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.range(of: #"^\d{10}(\d{3})?$"#, options: .regularExpression) != nil,
@@ -1931,6 +2059,7 @@ enum JDFinanceTradeOrderParser {
         return formatter.string(from: date)
     }
 
+    /// 从文本中解析完整日期时间（时间戳或「年月日 时分秒」形式）并归一化。
     private static func normalizedFullTimestamp(from text: String) -> String? {
         if let timestamp = normalizedTimestampText(from: text) {
             return timestamp
@@ -1965,6 +2094,7 @@ enum JDFinanceTradeOrderParser {
         return nil
     }
 
+    /// 从文本中按多种日期格式归一化为 `yyyy-MM-dd` 字符串。
     private static func normalizedDate(from text: String) -> String? {
         let patterns = [
             #"(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})"#,
@@ -2001,6 +2131,7 @@ enum JDFinanceTradeOrderParser {
         return nil
     }
 
+    /// 从文本中按「15:00 前/后」等表述识别交易时段。
     private static func explicitTimeType(from text: String) -> PositionTimeType? {
         let normalized = text.replacingOccurrences(of: "：", with: ":")
         if normalized.contains("15:00前")
@@ -2022,6 +2153,7 @@ enum JDFinanceTradeOrderParser {
         return nil
     }
 
+    /// 从文本中的时钟时间（如 14:30）推断交易时段（15:00 前/后）。
     private static func clockTimeType(from text: String) -> PositionTimeType? {
         let normalized = text.replacingOccurrences(of: "：", with: ":")
         let hourText = regexCaptures(pattern: #"\b([01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\b"#, in: normalized)?.first
@@ -2034,6 +2166,7 @@ enum JDFinanceTradeOrderParser {
         return hour < 15 ? .before15 : .after15
     }
 
+    /// 计算文本对给定关键词的命中数（用于字段路径优先级排序）。
     private static func score(_ value: String, keywords: [String]) -> Int {
         let lowercased = value.lowercased()
         return keywords.reduce(0) { total, keyword in
@@ -2041,6 +2174,8 @@ enum JDFinanceTradeOrderParser {
         }
     }
 
+    /// 将 JSON 中的任意值（字符串/数字/嵌套字典）尽力转换为字符串。
+    /// 将 JSON 中的任意值（字符串/数字/嵌套字典）尽力转换为字符串。
     private static func stringValue(_ value: Any?) -> String? {
         switch value {
         case let value as String:
@@ -2058,6 +2193,7 @@ enum JDFinanceTradeOrderParser {
         }
     }
 
+    /// 按候选键名顺序从字典中提取第一个非空字符串值。
     private static func firstStringValue(in dictionary: [String: Any], keys: [String]) -> String? {
         for key in keys {
             if let value = stringValue(dictionary[key]) {
@@ -2067,6 +2203,7 @@ enum JDFinanceTradeOrderParser {
         return nil
     }
 
+    /// 按候选键名顺序从字典中提取第一个数值。
     private static func firstNumericValue(in dictionary: [String: Any], keys: [String]) -> Double? {
         for key in keys {
             if let value = numericValue(dictionary[key]) {
@@ -2076,6 +2213,7 @@ enum JDFinanceTradeOrderParser {
         return nil
     }
 
+    /// 将 JSON 中的任意值（数字/字符串/嵌套字典）尽力转换为 `Double`。
     private static func numericValue(_ value: Any?) -> Double? {
         switch value {
         case let value as Double:
@@ -2097,6 +2235,7 @@ enum JDFinanceTradeOrderParser {
         }
     }
 
+    /// 清洗字符串（去逗号/百分号/加号）后解析为 `Double`，空或 `--` 返回 nil。
     private static func parseNumber(_ value: String) -> Double? {
         let match = regexCaptures(pattern: #"([+-]?[0-9][0-9,]*(?:\.[0-9]+)?)"#, in: value)?.first ?? value
         let normalized = match
@@ -2113,6 +2252,7 @@ enum JDFinanceTradeOrderParser {
         return Double(normalized)
     }
 
+    /// 将可能是 JSON 字符串的文本解析为对象（用于接口返回的字符串包裹 JSON）。
     private static func jsonObject(from text: String) -> Any? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("{") || trimmed.hasPrefix("["),
@@ -2123,6 +2263,7 @@ enum JDFinanceTradeOrderParser {
         return try? JSONSerialization.jsonObject(with: data)
     }
 
+    /// 正则提取所有捕获组（跳过第 0 组整体匹配），返回子串数组。
     private static func regexCaptures(pattern: String, in text: String) -> [String]? {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)

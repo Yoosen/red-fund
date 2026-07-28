@@ -15,6 +15,7 @@ struct JDFinancePerformanceSyncView: View {
     @State private var retryTask: Task<Void, Never>?
     @State private var isPresented = false
 
+    /// 初始化京东历史收益同步视图，创建同步 store（后续由 .task 触发同步）。
     init(
         portfolioStore: PortfolioStore,
         performanceStore: PortfolioPerformanceStore,
@@ -28,6 +29,7 @@ struct JDFinancePerformanceSyncView: View {
         _syncStore = State(initialValue: JDFinancePerformanceSyncStore())
     }
 
+    /// 渲染京东历史收益补全界面：标题栏 + 内容区；进入即按 Cookie 触发同步，退出时取消任务并复位。
     var body: some View {
         VStack(spacing: 0) {
             PanelHeader(
@@ -70,6 +72,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 按同步状态切换内容：加载中 / 需登录 / 成功 / 预览 / 错误。
     @ViewBuilder
     private var content: some View {
         if syncStore.isSyncing {
@@ -89,6 +92,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 加载中状态：大进度圈 + 状态文案 + 补全说明。
     private var loadingState: some View {
         VStack(spacing: 14) {
             ProgressView()
@@ -105,6 +109,7 @@ struct JDFinancePerformanceSyncView: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// 需登录状态：提示并引导用户登录京东以读取历史收益。
     private var loginState: some View {
         VStack(spacing: 14) {
             Image(systemName: "person.crop.circle.badge.exclamationmark")
@@ -135,6 +140,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 预览状态：范围卡 + 写入预览 + 冲突/跳过提示 + 应用按钮（可滚动）。
     private func previewState(_ plan: PortfolioPerformanceMergePlan) -> some View {
         ScrollView {
             VStack(spacing: 10) {
@@ -160,6 +166,7 @@ struct JDFinancePerformanceSyncView: View {
         .scrollIndicators(.never)
     }
 
+    /// 同步范围卡：起止日期 + 完整/部分标识，并说明仅读取账户级每日收益（不含今日未结算）。
     private func rangeCard(_ plan: PortfolioPerformanceMergePlan) -> some View {
         PanelSection(title: "同步范围") {
             VStack(alignment: .leading, spacing: 8) {
@@ -183,6 +190,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 写入预览：新增 / 估值升级 / 京东修正 / 冲突 计数网格，以及是否最新提示。
     private func changeSummary(_ plan: PortfolioPerformanceMergePlan) -> some View {
         PanelSection(title: "写入预览") {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 7), count: 2), spacing: 7) {
@@ -206,6 +214,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 已确认记录冲突区：默认保留本地已确认值，可开关注以京东为准（最多展示 6 条）。
     private func conflictSection(_ plan: PortfolioPerformanceMergePlan) -> some View {
         PanelSection(title: "已确认记录冲突") {
             VStack(alignment: .leading, spacing: 8) {
@@ -244,6 +253,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 被跳过行（零收益日 / 异常记录）的说明条。
     private func skippedRowsNotice(_ plan: PortfolioPerformanceMergePlan) -> some View {
         HStack(alignment: .top, spacing: 7) {
             Image(systemName: "info.circle")
@@ -258,6 +268,7 @@ struct JDFinancePerformanceSyncView: View {
         .overlay(PanelDesign.border(cornerRadius: 9))
     }
 
+    /// 应用按钮：按选择数与可应用性决定文案与可用性，点击后把合并计划写入收益 store。
     private func applyControl(_ plan: PortfolioPerformanceMergePlan) -> some View {
         let selectedCount = plan.selectedDayChangeCount(overwriteConflicts: overwritesConflicts)
         let canApply = plan.canApply(overwriteConflicts: overwritesConflicts)
@@ -282,6 +293,7 @@ struct JDFinancePerformanceSyncView: View {
         .keyboardShortcut(.defaultAction)
     }
 
+    /// 成功状态：完成图标 + 标题/文案 + “返回持仓收益”按钮。
     private func successState(_ plan: PortfolioPerformanceMergePlan) -> some View {
         VStack(spacing: 14) {
             Image(systemName: "checkmark.seal.fill")
@@ -309,6 +321,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 错误状态：错误图标 + 文案，并按账号不一致等情形提供清除旧账号 / 返回 / 重试按钮。
     private func errorState(_ message: String) -> some View {
         ScrollView {
             VStack(spacing: 13) {
@@ -368,6 +381,7 @@ struct JDFinancePerformanceSyncView: View {
         .scrollIndicators(.never)
     }
 
+    /// 预览指标单项：标题 + 数值（数值为 0 时灰色显示）。
     private func previewMetric(_ title: String, value: Int, tint: Color) -> some View {
         HStack {
             Text(title)
@@ -385,6 +399,7 @@ struct JDFinancePerformanceSyncView: View {
         .overlay(PanelDesign.border(cornerRadius: 8))
     }
 
+    /// 内联错误提示条（警告色背景）。
     private func inlineError(_ message: String) -> some View {
         Label(message, systemImage: "exclamationmark.triangle")
             .font(.system(size: 10, weight: .medium))
@@ -395,6 +410,7 @@ struct JDFinancePerformanceSyncView: View {
             .background(PanelDesign.warningBackground, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
+    /// 生成被跳过行的说明文本：零收益日数量与异常记录数量。
     private func skippedRowsText(_ plan: PortfolioPerformanceMergePlan) -> String {
         var parts: [String] = []
         if plan.zeroValueSkippedCount > 0 {
@@ -406,6 +422,7 @@ struct JDFinancePerformanceSyncView: View {
         return parts.joined(separator: "；")
     }
 
+    /// 生成应用按钮文案：补全 N 天 / 保存同步范围 / 需处理冲突 / 已是最新。
     private func applyTitle(
         selectedCount: Int,
         plan: PortfolioPerformanceMergePlan
@@ -422,6 +439,7 @@ struct JDFinancePerformanceSyncView: View {
         return "已是最新"
     }
 
+    /// 生成成功状态的标题文本（依是否改动与冲突情况变化）。
     private func successTitle(_ plan: PortfolioPerformanceMergePlan) -> String {
         let changed = plan.selectedDayChangeCount(overwriteConflicts: overwritesConflicts)
         if changed == 0, !plan.conflicts.isEmpty {
@@ -436,6 +454,7 @@ struct JDFinancePerformanceSyncView: View {
         return "历史收益已补全"
     }
 
+    /// 生成成功状态的说明文案（依改动量与冲突处理策略变化）。
     private func successText(_ plan: PortfolioPerformanceMergePlan) -> String {
         let changed = plan.selectedDayChangeCount(overwriteConflicts: overwritesConflicts)
         if changed == 0 {
@@ -450,10 +469,12 @@ struct JDFinancePerformanceSyncView: View {
         return "已写入或更新 \(changed) 个收益日；之后本地刷新会继续记录最新数据。"
     }
 
+    /// 金额文本：隐藏金额时返回掩码，否则格式化为带符号金额。
     private func amountText(_ value: Double) -> String {
         hidesAmounts ? "••••" : MoneyFormatter.money(value, signed: true)
     }
 
+    /// 触发登录流程：登录完成后用返回的 Cookie 头执行一次同步。
     private func requestLogin() {
         guard isPresented, !isRequestingLogin else { return }
         isRequestingLogin = true
@@ -466,6 +487,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 取消旧任务并重新读取 Cookie 后重新同步（需界面仍处于展示中）。
     private func retrySync() {
         localErrorMessage = nil
         retryTask?.cancel()
@@ -476,6 +498,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 清除旧账号的京东收益记录（保留本地来源）后重试同步；不支持时给出错误提示。
     private func clearHistoryAndRetry() {
         guard syncStore.canClearPerformanceHistoryForAccountMismatch else {
             localErrorMessage = syncStore.accountMismatchSource?.message
@@ -491,6 +514,7 @@ struct JDFinancePerformanceSyncView: View {
         }
     }
 
+    /// 记忆 Cookie 头并执行同步，携带本地账号指纹用于账号一致性校验。
     private func synchronize(cookieHeader: String?) async {
         JDFinanceWebSession.rememberCookieHeader(cookieHeader)
         await syncStore.synchronize(

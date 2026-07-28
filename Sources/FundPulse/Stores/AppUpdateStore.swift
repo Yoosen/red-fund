@@ -3,11 +3,13 @@ import Foundation
 import Observation
 import OSLog
 
+/// 更新模块的日志记录器。
 private let appUpdateStoreLogger = Logger(
     subsystem: Bundle.main.bundleIdentifier ?? "com.iamzjt.frontend.fund-pulse.swift",
     category: "AppUpdate"
 )
 
+/// 一次更新检查的请求描述（含代际编号、当前版本、模式与所属服务）。
 struct AppUpdateCheckRequest: Sendable, Equatable {
     var generation: Int
     var currentVersion: String
@@ -21,11 +23,14 @@ struct AppUpdateCheckRequest: Sendable, Equatable {
     }
 }
 
+/// 更新检查结果：成功（带状态）或失败（带原因）。
 enum AppUpdateCheckCompletion: Sendable, Equatable {
     case success(AppUpdateStatus)
     case failure(String)
 }
 
+/// 更新检查/下载/安装的状态机。
+/// 管理检查代际、UI 状态、下载进度，并在完成后触发安装。
 @Observable
 @MainActor
 final class AppUpdateStore {
@@ -41,6 +46,7 @@ final class AppUpdateStore {
         self.service = service
     }
 
+    /// 执行一次更新检查：先开启检查，再调用服务，最后收尾更新状态。
     func check(currentVersion: String, mode: AppUpdateCheckMode = .background) async {
         guard let request = startCheck(currentVersion: currentVersion, mode: mode) else { return }
         let completion: AppUpdateCheckCompletion
@@ -53,6 +59,7 @@ final class AppUpdateStore {
         finishCheck(request, completion: completion)
     }
 
+    /// 开启一次检查：校验当前状态是否允许检查，递增代际并返回请求描述。
     func startCheck(currentVersion: String, mode: AppUpdateCheckMode = .background) -> AppUpdateCheckRequest? {
         guard canCheckForUpdates(mode: mode) else {
             appUpdateStoreLogger.info("Skip update check mode=\(String(describing: mode), privacy: .public) status=\(String(describing: self.status), privacy: .public) currentMode=\(String(describing: self.currentCheckMode), privacy: .public)")
@@ -71,6 +78,7 @@ final class AppUpdateStore {
         )
     }
 
+    /// 收尾一次检查：忽略过期代际，按结果更新状态并记录检查时间。
     func finishCheck(_ request: AppUpdateCheckRequest, completion: AppUpdateCheckCompletion) {
         guard isCurrentCheck(request.generation) else {
             appUpdateStoreLogger.info("Ignore stale update check mode=\(String(describing: request.mode), privacy: .public) generation=\(request.generation, privacy: .public)")
@@ -88,6 +96,7 @@ final class AppUpdateStore {
         appUpdateStoreLogger.info("Finish update check mode=\(String(describing: request.mode), privacy: .public) generation=\(request.generation, privacy: .public) status=\(String(describing: self.status), privacy: .public)")
     }
 
+    /// 判断当前状态是否允许发起更新检查（交互式可打断后台检查）。
     private func canCheckForUpdates(mode: AppUpdateCheckMode) -> Bool {
         switch status {
         case .checking:
@@ -99,10 +108,12 @@ final class AppUpdateStore {
         }
     }
 
+    /// 判断给定代际是否为当前最新的检查（用于丢弃过期结果）。
     private func isCurrentCheck(_ generation: Int) -> Bool {
         generation == checkGeneration
     }
 
+    /// 根据当前状态执行主操作：有更新则开始下载，已下载则安装。
     func openUpdate() {
         switch status {
         case .available(let info):
@@ -116,6 +127,7 @@ final class AppUpdateStore {
         }
     }
 
+    /// 下载更新包：实时更新下载进度，完成后进入「已下载」状态。
     private func downloadUpdate(_ info: AppUpdateInfo) async {
         downloadProgress = 0
         status = .downloading(info)
@@ -130,6 +142,7 @@ final class AppUpdateStore {
         }
     }
 
+    /// 安装更新包：调用服务替换应用并终止当前进程以完成重启。
     private func installUpdate(info: AppUpdateInfo, package: AppUpdatePackage) {
         status = .installing(info)
         do {
@@ -144,6 +157,7 @@ final class AppUpdateStore {
         }
     }
 
+    /// 主操作按钮标题（随更新状态变化）。
     var primaryActionTitle: String? {
         switch status {
         case .available:
@@ -159,6 +173,7 @@ final class AppUpdateStore {
         }
     }
 
+    /// 主操作按钮图标（随更新状态变化）。
     var primaryActionSystemImage: String {
         switch status {
         case .available:
@@ -174,6 +189,7 @@ final class AppUpdateStore {
         }
     }
 
+    /// 主操作按钮是否禁用（下载/安装中禁用）。
     var isPrimaryActionDisabled: Bool {
         switch status {
         case .downloading, .installing:
@@ -183,6 +199,7 @@ final class AppUpdateStore {
         }
     }
 
+    /// 菜单栏/通知区域展示的状态文案（随更新状态变化）。
     var badgeTitle: String? {
         switch status {
         case .available(let info):

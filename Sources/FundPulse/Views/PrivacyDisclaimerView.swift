@@ -4,6 +4,7 @@ struct PrivacyDisclaimerView: View {
     let onBack: () -> Void
     let onOpenURL: (URL) -> Void
 
+    /// 渲染隐私与免责声明页面：头部标题栏 + 可滚动的声明正文 + 相关链接区。
     var body: some View {
         VStack(spacing: 0) {
             PanelHeader(
@@ -34,6 +35,7 @@ struct PrivacyDisclaimerView: View {
         .background(PanelDesign.panelBackground)
     }
 
+    /// 顶部“本地优先”简介卡片：概括应用本地存储、不上传个人数据的原则。
     private var introductionCard: some View {
         VStack(alignment: .leading, spacing: 7) {
             Label {
@@ -56,6 +58,7 @@ struct PrivacyDisclaimerView: View {
         .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
+    /// 相关链接区：在线隐私政策与问题反馈入口。
     private var linksSection: some View {
         PanelSection(title: "相关链接") {
             VStack(spacing: 7) {
@@ -80,9 +83,11 @@ struct PrivacyDisclaimerView: View {
     }
 }
 
+/// 单条法律/隐私章节的展示视图：渲染章节标题下的段落与要点。
 private struct LegalSectionView: View {
     let section: LegalContent.Section
 
+    /// 渲染章节标题下的段落列表与要点列表。
     var body: some View {
         PanelSection(title: section.title) {
             VStack(alignment: .leading, spacing: 7) {
@@ -109,6 +114,7 @@ private struct LegalSectionView: View {
     }
 }
 
+#if canImport(PreviewsMacros)
 #Preview("隐私与免责声明") {
     PrivacyDisclaimerView(
         onBack: {},
@@ -119,3 +125,4 @@ private struct LegalSectionView: View {
         height: PopoverLayout.privacyDisclaimerSize.height
     )
 }
+#endif

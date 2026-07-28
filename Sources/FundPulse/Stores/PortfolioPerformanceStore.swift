@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 
+/// 收益历史持久化存储可能抛出的错误。
 enum PortfolioPerformanceStoreError: LocalizedError, Equatable {
     case unsupportedSchemaVersion(Int)
     case unreadablePersistedData(String)
@@ -15,6 +16,8 @@ enum PortfolioPerformanceStoreError: LocalizedError, Equatable {
     }
 }
 
+/// 收益历史（`PortfolioPerformanceSnapshot`）的持久化存储。
+/// 负责加载/保存收益快照、并入京东同步结果，并支持导入导出。
 @Observable
 @MainActor
 final class PortfolioPerformanceStore {
@@ -28,10 +31,12 @@ final class PortfolioPerformanceStore {
         load()
     }
 
+    /// 收益历史数据文件路径（portfolio-performance.json）。
     var dataFileURL: URL {
         dataDirectory.appending(path: "portfolio-performance.json")
     }
 
+    /// 从磁盘加载收益快照：版本过高则保留不覆盖，损坏则标记不可读。
     func load() {
         do {
             guard FileManager.default.fileExists(atPath: dataFileURL.path) else {
@@ -67,6 +72,7 @@ final class PortfolioPerformanceStore {
     }
 
     @discardableResult
+    /// 由完整持仓快照生成候选收益记录并落盘（无变化则返回 false）。
     func record(
         portfolio: PortfolioSnapshot,
         now: Date = .now,
@@ -82,6 +88,7 @@ final class PortfolioPerformanceStore {
         return record(candidate)
     }
 
+    /// 写入一条候选收益记录并更新内存快照。
     @discardableResult
     func record(_ candidate: PortfolioPerformanceRecorder.Candidate) -> Bool {
         guard !hasUnreadablePersistedData else { return false }
@@ -99,6 +106,7 @@ final class PortfolioPerformanceStore {
         }
     }
 
+    /// 清空全部收益历史。
     @discardableResult
     func clear() -> Bool {
         do {
@@ -113,6 +121,7 @@ final class PortfolioPerformanceStore {
         }
     }
 
+    /// 整体替换收益快照（校验版本后归一化并落盘）。
     func replace(_ replacement: PortfolioPerformanceSnapshot) throws {
         guard replacement.schemaVersion <= PortfolioPerformanceSnapshot.currentSchemaVersion else {
             throw PortfolioPerformanceStoreError.unsupportedSchemaVersion(replacement.schemaVersion)
@@ -124,6 +133,7 @@ final class PortfolioPerformanceStore {
         hasUnreadablePersistedData = false
     }
 
+    /// 将京东历史收益合并计划应用到本地收益快照（可覆盖冲突）。
     @discardableResult
     func applyJDFinancePerformanceMerge(
         _ plan: PortfolioPerformanceMergePlan,
@@ -142,40 +152,48 @@ final class PortfolioPerformanceStore {
         return true
     }
 
+    /// 从二进制数据导入收益快照（解码后整体替换）。
     func importSnapshot(from data: Data) throws {
         let decoded = try Self.decoder.decode(PortfolioPerformanceSnapshot.self, from: data)
         try replace(decoded)
     }
 
+    /// 从文件 URL 导入收益快照。
     func importSnapshot(from url: URL) throws {
         try importSnapshot(from: Data(contentsOf: url))
     }
 
+    /// 导出当前收益快照为二进制数据。
     func exportSnapshot() throws -> Data {
         try ensurePersistedDataIsReadable()
         return try Self.encoder.encode(snapshot)
     }
 
+    /// 返回可用于导出的内存快照。
     func snapshotForExport() throws -> PortfolioPerformanceSnapshot {
         try ensurePersistedDataIsReadable()
         return snapshot
     }
 
+    /// 将收益快照导出到指定文件。
     func exportSnapshot(to url: URL) throws {
         try exportSnapshot().write(to: url, options: .atomic)
     }
 
+    /// 将收益快照原子写入磁盘。
     private func persist(_ value: PortfolioPerformanceSnapshot) throws {
         try FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
         try Self.encoder.encode(value).write(to: dataFileURL, options: .atomic)
     }
 
+    /// 校验当前持久化数据可读，否则抛出不可读错误。
     private func ensurePersistedDataIsReadable() throws {
         guard !hasUnreadablePersistedData else {
             throw PortfolioPerformanceStoreError.unreadablePersistedData(lastError ?? "未知错误")
         }
     }
 
+    /// 带 ISO8601 日期策略的收益快照编码器。
     private static var encoder: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -183,6 +201,7 @@ final class PortfolioPerformanceStore {
         return encoder
     }
 
+    /// 带 ISO8601 日期策略的收益快照解码器。
     private static var decoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601

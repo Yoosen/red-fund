@@ -1,7 +1,9 @@
 import Foundation
 import CoreFoundation
 
+/// 京东金融历史收益接口响应解析器（JSON → [JDFinancePerformanceDay]）。
 enum JDFinancePerformanceHistoryParser {
+    /// 解析历史收益数据；结构异常或登录失效时抛出对应错误。
     static func parse(data: Data) throws -> [JDFinancePerformanceDay] {
         let object: Any
         do {
@@ -75,6 +77,7 @@ enum JDFinancePerformanceHistoryParser {
         return days.sorted { $0.date < $1.date }
     }
 
+    /// 校验外层信封（resultCode/success），识别登录失效与业务错误。
     private static func validateOuterEnvelope(_ envelope: [String: Any]) throws {
         let message = message(in: envelope)
         if isLoginFailure(code: envelope["resultCode"], message: message) {
@@ -92,6 +95,7 @@ enum JDFinancePerformanceHistoryParser {
         }
     }
 
+    /// 校验内层信封（code/success），识别登录失效与业务错误。
     private static func validateInnerEnvelope(_ envelope: [String: Any]) throws {
         let message = message(in: envelope)
         if isLoginFailure(code: envelope["code"], message: message) {
@@ -109,6 +113,7 @@ enum JDFinancePerformanceHistoryParser {
         }
     }
 
+    /// 判断是否为登录失效（依据状态码或消息文案）。
     private static func isLoginFailure(code: Any?, message: String?) -> Bool {
         let normalizedCode = stringValue(code)?.lowercased() ?? ""
         if ["3", "0003", "1003", "not_login", "notlogin", "login_expired"].contains(normalizedCode) {
@@ -123,6 +128,7 @@ enum JDFinancePerformanceHistoryParser {
             || normalizedMessage.contains("login expired")
     }
 
+    /// 从信封中提取消息文案（尝试多种常见键名）。
     private static func message(in object: [String: Any]) -> String? {
         for key in ["message", "resultMsg", "msg"] {
             if let value = object[key] as? String,
@@ -134,16 +140,19 @@ enum JDFinancePerformanceHistoryParser {
         return nil
     }
 
+    /// 校验日期键格式是否为合法 yyyy-MM-dd。
     private static func isValidDate(_ value: String) -> Bool {
         guard let date = DateOnlyFormatter.parse(value) else { return false }
         return DateOnlyFormatter.string(from: date) == value
     }
 
+    /// 必填数值：nil 或 NSNull 视为缺失，返回 nil。
     private static func requiredNumber(_ value: Any?) -> Double? {
         guard let value, !(value is NSNull) else { return nil }
         return optionalNumber(value)
     }
 
+    /// 宽松解析数值：支持字符串（去除货币/百分号符号）与 NSNumber（排除布尔）。
     private static func optionalNumber(_ value: Any) -> Double? {
         if let number = value as? NSNumber {
             guard !isBooleanNumber(number) else { return nil }
@@ -167,6 +176,7 @@ enum JDFinancePerformanceHistoryParser {
         return parsed
     }
 
+    /// 解析整型（NSNumber 排除布尔，或字符串转 Int）。
     private static func integerValue(_ value: Any?) -> Int? {
         if let number = value as? NSNumber {
             guard !isBooleanNumber(number) else { return nil }
@@ -178,6 +188,7 @@ enum JDFinancePerformanceHistoryParser {
         return nil
     }
 
+    /// 解析字符串（NSNumber 排除布尔，否则直接取字符串）。
     private static func stringValue(_ value: Any?) -> String? {
         if let string = value as? String {
             return string
@@ -189,6 +200,7 @@ enum JDFinancePerformanceHistoryParser {
         return nil
     }
 
+    /// 判断 NSNumber 实际是否为布尔类型（CFBoolean）。
     private static func isBooleanNumber(_ number: NSNumber) -> Bool {
         CFGetTypeID(number) == CFBooleanGetTypeID()
     }
