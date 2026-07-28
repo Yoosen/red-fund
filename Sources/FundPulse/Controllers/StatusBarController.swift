@@ -734,7 +734,9 @@ final class StatusBarController: NSObject {
         installEventMonitorsIfNeeded()
 
         refreshQuotesAndStatusTitle()
-        checkForUpdates()
+        if settingsStore.settings.autoUpdateCheckEnabled {
+            checkForUpdates()
+        }
     }
 
     // 首次创建主面板窗口：设置收尾回调、HostingView，并应用外观
@@ -2103,6 +2105,7 @@ final class StatusBarController: NSObject {
             refreshContextMenuUpdateItem()
             return true
         }
+        guard settingsStore.settings.autoUpdateCheckEnabled else { return false }
         guard updateStore.status.shouldCheckWhenOpeningContextMenu else { return false }
         guard let request = updateStore.startCheck(currentVersion: appVersion, mode: .interactive) else { return false }
         let checkID = UUID()

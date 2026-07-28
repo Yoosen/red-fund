@@ -57,6 +57,8 @@ struct AppSettings: Codable, Equatable {
     var defaultMarketIndexID: MarketIndexID = Self.defaultMarketIndexIdentifier
     /// 是否开启 Beta 功能开关。
     var betaFeaturesEnabled: Bool = false
+    /// 是否自动检查更新；关闭后启动与打开菜单时不再自动检查并提示（手动检查仍可用）。
+    var autoUpdateCheckEnabled: Bool = true
     /// 已完成的新手引导版本；nil 表示尚未完成引导。
     var completedOnboardingVersion: Int? = nil
 
@@ -78,6 +80,7 @@ struct AppSettings: Codable, Equatable {
         showsMarketIndexes: Bool = true,
         defaultMarketIndexID: MarketIndexID = Self.defaultMarketIndexIdentifier,
         betaFeaturesEnabled: Bool = false,
+        autoUpdateCheckEnabled: Bool = true,
         completedOnboardingVersion: Int? = nil
     ) {
         self.settingsSchemaVersion = settingsSchemaVersion
@@ -96,6 +99,7 @@ struct AppSettings: Codable, Equatable {
         self.showsMarketIndexes = showsMarketIndexes
         self.defaultMarketIndexID = defaultMarketIndexID
         self.betaFeaturesEnabled = betaFeaturesEnabled
+        self.autoUpdateCheckEnabled = autoUpdateCheckEnabled
         self.completedOnboardingVersion = completedOnboardingVersion
     }
 
@@ -117,6 +121,7 @@ struct AppSettings: Codable, Equatable {
         case showsMarketIndexes
         case defaultMarketIndexID
         case betaFeaturesEnabled
+        case autoUpdateCheckEnabled
         case completedOnboardingVersion
     }
 
@@ -169,6 +174,7 @@ struct AppSettings: Codable, Equatable {
             .flatMap(MarketIndexID.init(rawValue:))
             ?? Self.defaultMarketIndexIdentifier
         betaFeaturesEnabled = try container.decodeIfPresent(Bool.self, forKey: .betaFeaturesEnabled) ?? false
+        autoUpdateCheckEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoUpdateCheckEnabled) ?? true
         if container.contains(.completedOnboardingVersion) {
             completedOnboardingVersion = try container.decodeIfPresent(
                 Int.self,

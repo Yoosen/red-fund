@@ -144,6 +144,12 @@ final class AppSettingsStore {
         try? save()
     }
 
+    /// 设置是否自动检查更新（关闭后不再自动检查并提示，手动检查不受影响）。
+    func setAutoUpdateCheckEnabled(_ isEnabled: Bool) {
+        settings.autoUpdateCheckEnabled = isEnabled
+        try? save()
+    }
+
     /// 设置文件在应用数据目录中的路径（settings.json）。
     var settingsFileURL: URL {
         dataDirectory.appending(path: "settings.json")

@@ -72,6 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         statusBarController?.presentDebugPanelIfRequested()     // Debug 下按需弹出调试面板
 #endif
         Task {
+            // 仅在开启自动检查更新时，启动后异步进行一次后台更新检查
+            guard settingsStore.settings.autoUpdateCheckEnabled else { return }
             await checkForUpdates() // 启动后异步进行一次后台更新检查
         }
     }

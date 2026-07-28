@@ -320,7 +320,38 @@ struct SettingsView: View {
             PanelSection(title: "通知测试") {
                 notificationTestSection
             }
+
+            PanelSection(title: "自动检查更新") {
+                autoUpdateCheckSection
+            }
         }
+    }
+
+    /// “自动更新检查”子区块：总开关，控制启动与打开菜单时是否自动检查更新。
+    private var autoUpdateCheckSection: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                // Text("自动检查更新")
+                //     .font(.system(size: 12, weight: .semibold))
+                Text("关闭后，程序启动或打开菜单时不再自动检查更新并提示；手动「检查更新」仍然可用。")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            FocuslessSwitch(isOn: autoUpdateCheckEnabledBinding)
+                .frame(width: 54, height: 30)
+        }
+    }
+
+    /// 自动检查更新开关的双向绑定：写入 settingsStore 并触发 onSettingsChanged。
+    private var autoUpdateCheckEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.autoUpdateCheckEnabled },
+            set: { isEnabled in
+                settingsStore.setAutoUpdateCheckEnabled(isEnabled)
+                onSettingsChanged?()
+            }
+        )
     }
 
     /// “数据”分区：实验功能 / 京东会话 / 本地数据（清空持仓）。
