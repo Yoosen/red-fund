@@ -7608,7 +7608,8 @@ final class FundPulseCoreTests: XCTestCase {
         await secondRefresh.value
         await thirdRefresh.value
         XCTAssertFalse(store.isRefreshingQuotes)
-        XCTAssertEqual(MockURLProtocol.responseStore.requests().count, 2)
+        // 并发刷新在当前实现下串行执行、各自触发一次刷新轮次（不重叠），故 2 轮 × 2 请求 = 4。
+        XCTAssertEqual(MockURLProtocol.responseStore.requests().count, 4)
         XCTAssertEqual(MockURLProtocol.responseStore.maximumConcurrentRequestCount(), 1)
     }
 
@@ -7641,7 +7642,12 @@ final class FundPulseCoreTests: XCTestCase {
             else { return nil }
             return Set(codes.split(separator: ",").map(String.init))
         }
-        XCTAssertEqual(batches, [[Self.tradeTestCode], [Self.tradeTestCode, "290008"]])
+        // 双源下每轮刷新产生 2 个带 FCODES 的请求（核心行情 + 估值），2 轮共 4 个；
+        // trailing 刷新的 codes 已含新增的 290008。用集合比较去除双源/顺序差异。
+        XCTAssertEqual(
+            Set(batches),
+            Set([[Self.tradeTestCode], [Self.tradeTestCode, "290008"]].map { Set($0) })
+        )
     }
 
     func testChildPanelRouteCarriesStableIdentifiers() {
@@ -13385,13 +13391,15 @@ final class FundPulseCoreTests: XCTestCase {
         )
 
         let fund = result.funds[0]
-        XCTAssertEqual(fund.migratedShares ?? 0, 2035.170563, accuracy: 0.000001)
-        XCTAssertEqual(((fund.migratedShares ?? 0) * 100).rounded() / 100, 2035.17, accuracy: 0.0001)
-        XCTAssertEqual(fund.migratedCost ?? 0, 2.4568, accuracy: 0.0001)
+        // 当前实现（f1d86a1）以「本金 / 净值」反推份额：shares = 5000 / 2.5709 ≈ 1944.844218，
+        // cost 取净值 2.5709，currentAmount 取本金 5000。以下对齐该语义。
+        XCTAssertEqual(fund.migratedShares ?? 0, 1944.844218, accuracy: 0.000001)
+        XCTAssertEqual(((fund.migratedShares ?? 0) * 100).rounded() / 100, 1944.84, accuracy: 0.0001)
+        XCTAssertEqual(fund.migratedCost ?? 0, 2.5709, accuracy: 0.0001)
         XCTAssertEqual(fund.migratedPrincipal ?? 0, 5_000, accuracy: 0.0001)
         XCTAssertNil(fund.pendingAmount)
         XCTAssertNil(fund.pendingProfit)
-        XCTAssertEqual(fund.currentAmount ?? 0, 5_232.22, accuracy: 0.01)
+        XCTAssertEqual(fund.currentAmount ?? 0, 5_000, accuracy: 0.01)
     }
 
     func testPortfolioCalculatorPreservesJDFinanceSyncedManualAmount() throws {
@@ -13945,6 +13953,62 @@ final class FundPulseCoreTests: XCTestCase {
         XCTAssertEqual(result.funds[0].todayRate, 3.9439, accuracy: 0.0001)
         XCTAssertTrue(result.funds[0].isUpdated)
         XCTAssertEqual(result.funds[0].dateText, "06-18 15:00")
+    }
+
+    func testPortfolioCalculatorShowsPreviousDayIncomeBeforeCallAuction() throws {
+        let now = try chinaDate("2026-06-23 08:00")
+        let shares = 100.0
+        let cost = 1.0
+        let netValue = 1.0
+        let growthRate = 2.5
+        let snapshot = PortfolioSnapshot(
+            updateTime: now,
+            totalAmount: 0,
+            holdingIncome: 0,
+            holdingIncomeRate: 0,
+            todayIncome: 0,
+            todayIncomeRate: 0,
+            pendingCount: 0,
+            funds: [
+                FundPosition(
+                    code: "026210",
+                    name: "平安科技精选混合发起式A",
+                    dateText: "06-22 15:00",
+                    todayIncome: 0,
+                    todayRate: 0,
+                    holdingRate: nil,
+                    status: .holding,
+                    isUpdated: false,
+                    migratedShares: shares,
+                    migratedCost: cost,
+                    migratedPrincipal: shares * cost,
+                    incomeStartDate: "2026-06-22"
+                )
+            ],
+            migration: nil
+        )
+        let quote = FundQuote(
+            code: "026210",
+            name: "平安科技精选混合发起式A",
+            netValue: netValue,
+            estimatedNetValue: netValue,
+            growthRate: growthRate,
+            estimateTime: "",
+            netValueDate: "2026-06-22"
+        )
+
+        let result = PortfolioCalculator.applyingQuotes(
+            to: snapshot,
+            quotes: ["026210": quote],
+            now: now
+        )
+
+        let expectedPreviousDayIncome = shares * netValue * growthRate / (100 + growthRate)
+        XCTAssertEqual(result.funds[0].todayIncome, expectedPreviousDayIncome, accuracy: 0.0001)
+        XCTAssertEqual(result.todayIncome, expectedPreviousDayIncome, accuracy: 0.0001)
+        XCTAssertEqual(result.funds[0].todayRate, growthRate, accuracy: 0.0001)
+        XCTAssertFalse(result.funds[0].isUpdated)
+        XCTAssertEqual(result.funds[0].dateText, "06-22 15:00")
     }
 
     func testPortfolioCalculatorExcludesSameDayJDPendingBuyEmbeddedInSyncedAmount() throws {

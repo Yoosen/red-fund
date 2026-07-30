@@ -294,6 +294,11 @@ enum PortfolioCalculator {
     private static func dailyQuoteState(for quote: FundQuote, now: Date) -> DailyQuoteState {
         guard TradingCalendar.isFundTradingDay(now) else { return .inactive }
 
+        // 9:15 集合竞价之前当日估值尚未产生，展示上一交易日的已结算收益（quote 中的净值即昨日收盘值）。
+        if TradingCalendar.isBeforeDailyCallAuction(now: now) {
+            return .officialUpdated
+        }
+
         let today = DateOnlyFormatter.string(from: now)
         if quote.netValueDate == today {
             return .officialUpdated

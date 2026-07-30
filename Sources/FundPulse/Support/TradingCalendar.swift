@@ -96,6 +96,18 @@ enum TradingCalendar {
         marketSessionState(now: now) == .open
     }
 
+    /// 集合竞价开始时刻（9:15，上海时区）。在此之前当日估值尚未产生。
+    static let callAuctionStartMinutes = 9 * 60 + 15
+
+    /// 当前是否处于「当日 9:15 集合竞价之前」。
+    /// 仅对交易日有意义；非交易日直接返回 false。
+    static func isBeforeDailyCallAuction(now: Date = .now) -> Bool {
+        guard isFundTradingDay(now) else { return false }
+        let minutes = chinaCalendar.component(.hour, from: now) * 60
+            + chinaCalendar.component(.minute, from: now)
+        return minutes < callAuctionStartMinutes
+    }
+
     /// 从当前时间起，返回下一个交易时段边界（开盘/午休开始/下午开盘/收盘）。
     static func nextMarketSessionBoundary(after now: Date = .now) -> Date? {
         let calendar = chinaCalendar

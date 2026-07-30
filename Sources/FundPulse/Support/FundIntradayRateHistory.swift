@@ -45,7 +45,8 @@ enum FundIntradayRateHistoryRecorder {
 
         next.funds = snapshot.funds.map { fund in
             var updatedFund = resetIfNeeded(fund, tradingDay: tradingDay)
-            updatedFund = normalizeHistoryIfNeeded(updatedFund)
+            // updatedFund = normalizeHistoryIfNeeded(updatedFund)
+            updatedFund = normalizeHistoryIfNeeded(updatedFund, tradingDay: tradingDay)
 
             guard TradingCalendar.marketSessionState(now: now) == .open else {
                 return updatedFund
@@ -104,12 +105,12 @@ enum FundIntradayRateHistoryRecorder {
         return next
     }
 
-    /// 对已有盘中历史执行去重与排序归一化。
-    private static func normalizeHistoryIfNeeded(_ fund: FundPosition) -> FundPosition {
+    /// 对已有盘中历史执行去重与排序归一化（按当前交易日过滤，避免误删历史点）。
+    private static func normalizeHistoryIfNeeded(_ fund: FundPosition, tradingDay: String) -> FundPosition {
         guard let points = fund.intradayRateHistory else { return fund }
 
         var next = fund
-        next.intradayRateHistory = normalizedPoints(points)
+        next.intradayRateHistory = normalizedPoints(points, tradingDay: tradingDay)
         return next
     }
 

@@ -1,3 +1,6 @@
+# .xcode
+.swiftpm/
+
 # workbuddy
 .workbuddy/
 .codebuddy/
