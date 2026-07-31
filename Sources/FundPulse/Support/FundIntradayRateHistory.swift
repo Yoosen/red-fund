@@ -90,9 +90,10 @@ enum FundIntradayRateHistoryRecorder {
             .sorted { $0.timestamp < $1.timestamp }
     }
 
-    /// 将日期格式化为交易日字符串。
+    /// 将日期映射为盘中历史的「有效交易日」字符串。
+    /// 9:15 集合竞价前及非交易日回溯至上一交易日，使昨日盘中预估曲线在次日 9:15 前完整保留展示。
     static func tradingDayString(from date: Date) -> String {
-        dayFormatter.string(from: date)
+        dayFormatter.string(from: TradingCalendar.effectiveIntradayTradingDay(now: date))
     }
 
     /// 若交易日变更，清空旧的盘中历史。

@@ -108,6 +108,24 @@ enum TradingCalendar {
         return minutes < callAuctionStartMinutes
     }
 
+    /// 盘中数据的「有效交易日」：
+    /// - 交易日 9:15（集合竞价）之后 → 当天；
+    /// - 交易日 9:15 之前、周末与节假日 → 回溯至上一交易日。
+    /// 用于盘中预估历史等「当日预测信息」的生命周期判定，使 9:15 前仍视为上一交易日。
+    static func effectiveIntradayTradingDay(now: Date = .now) -> Date {
+        if isFundTradingDay(now), !isBeforeDailyCallAuction(now: now) {
+            return now
+        }
+        let calendar = chinaCalendar
+        var day = calendar.date(byAdding: .day, value: -1, to: now) ?? now
+        var attempts = 0
+        while !isFundTradingDay(day), attempts < 366 {
+            day = calendar.date(byAdding: .day, value: -1, to: day) ?? day
+            attempts += 1
+        }
+        return day
+    }
+
     /// 从当前时间起，返回下一个交易时段边界（开盘/午休开始/下午开盘/收盘）。
     static func nextMarketSessionBoundary(after now: Date = .now) -> Date? {
         let calendar = chinaCalendar

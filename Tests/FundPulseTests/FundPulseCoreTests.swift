@@ -16090,13 +16090,18 @@ final class FundPulseCoreTests: XCTestCase {
         )
         XCTAssertEqual(afterClose.funds[0].intradayRateHistory?.count, 2)
 
+        // 次日 9:15 集合竞价前仍视为上一交易日，昨日盘中预估曲线完整保留、不清空不更新。
         let beforeOpenNextDay = FundIntradayRateHistoryRecorder.applyingQuotes(
             to: afterClose,
             quotes: ["026210": nextDayQuote],
             now: try chinaDate("2026-06-25 08:50")
         )
-        XCTAssertEqual(beforeOpenNextDay.funds[0].intradayRateDate, "2026-06-25")
-        XCTAssertTrue(beforeOpenNextDay.funds[0].intradayRateHistory?.isEmpty ?? true)
+        XCTAssertEqual(beforeOpenNextDay.funds[0].intradayRateDate, "2026-06-24")
+        XCTAssertEqual(beforeOpenNextDay.funds[0].intradayRateHistory?.count, 2)
+        XCTAssertEqual(
+            beforeOpenNextDay.funds[0].intradayRateHistory?.map(\.estimateTime),
+            ["2026-06-24 10:58", "2026-06-24 13:01"]
+        )
 
         let openNextDay = FundIntradayRateHistoryRecorder.applyingQuotes(
             to: beforeOpenNextDay,
