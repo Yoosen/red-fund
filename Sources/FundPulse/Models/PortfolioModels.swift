@@ -548,8 +548,8 @@ enum FundListDisplayRules {
 
 /// 持仓计价模式（金额/份额）。
 enum PositionMode: String, Codable, CaseIterable, Identifiable, Equatable {
-    case amount
     case share
+    case amount
 
     /// 用作 Identifiable 的稳定标识。
     var id: String { rawValue }

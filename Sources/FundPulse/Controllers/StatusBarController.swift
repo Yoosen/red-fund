@@ -384,6 +384,7 @@ final class StatusBarController: NSObject {
     private var jdFinanceLoginWindow: FundPulsePanel?   // 京东金融网页面板
     private var mainPanelHostingView: NSHostingView<AnyView>?
     private var activeChildPanel: ChildPanelRoute?      // 当前打开的子面板路由
+    private var childPanelReturnRoute: ChildPanelRoute? // 交易/编辑类子面板的"返回路由"（取消时回退到上一步，而非直接关闭）
     private var selectedFundCode: String?               // 当前选中的基金代码
     private var jdFinanceLoginCompletion: ((String?) -> Void)? // 京东登录完成回调（cookieHeader 或 nil）
     private var localEventMonitor: Any?                 // 应用内事件监听（点窗外关闭等）
@@ -1213,15 +1214,19 @@ final class StatusBarController: NSObject {
                 store: store,
                 fundCode: fundCode,
                 onBuy: { [weak self] fund in
+                    self?.childPanelReturnRoute = .fundDetail(fundCode: fund.code)
                     self?.showChildPanel(.buyFund(fundCode: fund.code))
                 },
                 onSell: { [weak self] fund in
+                    self?.childPanelReturnRoute = .fundDetail(fundCode: fund.code)
                     self?.showChildPanel(.sellFund(fundCode: fund.code))
                 },
                 onConvert: { [weak self] fund in
+                    self?.childPanelReturnRoute = .fundDetail(fundCode: fund.code)
                     self?.showChildPanel(.convertFund(fundCode: fund.code))
                 },
                 onEdit: { [weak self] fund in
+                    self?.childPanelReturnRoute = .fundDetail(fundCode: fund.code)
                     self?.showChildPanel(.editFund(fundCode: fund.code))
                 },
                 onOpenTradeRecords: { [weak self] fund in
@@ -1289,7 +1294,7 @@ final class StatusBarController: NSObject {
                     }
                 },
                 onClose: { [weak self] in
-                    self?.hideChildPanel()
+                    self?.dismissChildPanelToReturnRoute()
                 }
             )
             return (PanelFocusAppearance.hostingView(view), PopoverLayout.tradeEditorSize)
@@ -1307,7 +1312,7 @@ final class StatusBarController: NSObject {
                     }
                 },
                 onClose: { [weak self] in
-                    self?.hideChildPanel()
+                    self?.dismissChildPanelToReturnRoute()
                 }
             )
             return (PanelFocusAppearance.hostingView(view), PopoverLayout.tradeEditorSize)
@@ -1324,7 +1329,7 @@ final class StatusBarController: NSObject {
                     }
                 },
                 onClose: { [weak self] in
-                    self?.hideChildPanel()
+                    self?.dismissChildPanelToReturnRoute()
                 }
             )
             return (PanelFocusAppearance.hostingView(view), PopoverLayout.tradeEditorSize)
@@ -1429,7 +1434,7 @@ final class StatusBarController: NSObject {
                     }
                 },
                 onClose: { [weak self] in
-                    self?.hideChildPanel()
+                    self?.dismissChildPanelToReturnRoute()
                 }
             )
             return (PanelFocusAppearance.hostingView(view), PopoverLayout.editorSize)
@@ -1439,6 +1444,8 @@ final class StatusBarController: NSObject {
     // 根据"待确认交易活动"找到对应记录/基金，弹出合适的编辑面板
     // （优先按记录 ID / 转换 ID 匹配，否则按"待确认+代码+类型+日期"匹配，实在没有则按活动类型开新建面板）
     private func showPendingActivity(_ activity: PendingTradeActivity) {
+        // 从主面板"待确认活动"进入的编辑面板，取消后应回到主面板（无返回路由）
+        childPanelReturnRoute = nil
         let records = store.snapshot.tradeRecords ?? []
         let matchingRecord = pendingActivityRecord(activity, records: records)
         let matchingFund = activity.fund ?? store.snapshot.funds.first { $0.code == activity.code }
@@ -1504,6 +1511,17 @@ final class StatusBarController: NSObject {
         }
         childPanelWindow?.orderOut(nil)
         clearChildPanelState()
+    }
+
+    /// 关闭交易/编辑类子面板时"返回上一步"：若存在返回路由则回到对应面板（如基金详情），否则直接关闭回到主面板。
+    /// 用于修正"在基金详情页点加仓/减仓/编辑后取消，却直接关掉详情页"的问题。
+    private func dismissChildPanelToReturnRoute() {
+        if let returnRoute = childPanelReturnRoute {
+            childPanelReturnRoute = nil
+            showChildPanel(returnRoute)
+        } else {
+            hideChildPanel()
+        }
     }
 
     // 隐私声明页"返回"：根据来源回到设置或引导

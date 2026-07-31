@@ -37,7 +37,9 @@ struct FundPositionEditorView: View {
         self.onSaved = onSaved
         self.onClose = onClose
 
-        let mode = fund?.positionMode ?? .amount
+        // 持仓编辑默认按"份额"录入（与加仓/减仓/转换保持一致），而非按"金额"。
+        // 金额基金的金额数据仍由 positionAmount 草稿保留，切回"金额"即可恢复，不会丢失。
+        let mode: PositionMode = .share
         let date = fund?.positionDate.flatMap(DateOnlyFormatter.parse) ?? .now
         let netValue: Double? = {
             guard let principal = fund?.migratedPrincipal,
