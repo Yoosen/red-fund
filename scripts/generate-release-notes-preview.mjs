@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildChangelogEntry, loadReleaseNoteFragments } from "./lib/release-notes.mjs";
+import { parseChangesFile } from "./lib/changes-file.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -32,22 +33,36 @@ async function readChangesFile() {
   }
 }
 
+// 把解析出的分类 sections 渲染成按「标题」分组的 Markdown 块。
+function renderClassifiedSections(sections) {
+  return sections
+    .map((section) => `### ${section.title}\n\n${section.items.map((item) => `- ${item}`).join("\n")}`)
+    .join("\n\n");
+}
+
 async function main() {
   const version = await readVersion();
   const date = (process.env.RELEASE_PREVIEW_DATE || new Date().toISOString().slice(0, 10));
   const fragmentsDir = path.join(root, ".release-notes");
 
-  const { fragments } = await loadReleaseNoteFragments(fragmentsDir);
   const manualNotes = await readChangesFile();
+  const { sections } = manualNotes ? parseChangesFile(manualNotes) : { sections: [] };
 
-  // 优先用固定单文件 changes.md；为空时回退到片段机制；再为空则允许空说明。
-  const entry = buildChangelogEntry({
-    version,
-    date,
-    fragments,
-    manualNotes: manualNotes ?? undefined,
-    allowEmpty: !manualNotes,
-  });
+  let entry;
+  if (sections.length > 0) {
+    // 固定单文件 changes.md（支持 ## 分类）优先。
+    const content = renderClassifiedSections(sections);
+    entry = `## v${version} - ${date}\n\n${content.trim()}\n`;
+  } else {
+    // 回退：旧的片段机制（仅当 changes.md 为空时）。
+    const { fragments } = await loadReleaseNoteFragments(fragmentsDir);
+    entry = buildChangelogEntry({
+      version,
+      date,
+      fragments,
+      allowEmpty: true,
+    });
+  }
 
   // 同时写文件（供 artifact 上传）并打印到日志。
   const outPath = path.join(root, "RELEASE_NOTES_PREVIEW.md");

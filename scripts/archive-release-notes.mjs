@@ -8,6 +8,8 @@ import { readFile, writeFile, truncate } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { parseChangesFile } from "./lib/changes-file.mjs";
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const NOTES_DIR = path.join(root, ".release-notes");
@@ -36,14 +38,13 @@ if (!changes) {
   process.exit(0);
 }
 
-// 规范化：保留多行，过滤空行，转为无序列表项。
-const lines = changes
-  .split("\n")
-  .map((line) => line.trim())
-  .filter(Boolean)
-  .map((line) => (line.startsWith("-") || line.startsWith("*") ? line : `- ${line}`));
-
-const block = `## v${version} - ${date}\n\n${lines.join("\n")}\n`;
+// 解析分类结构；没有 ## 分类标题时，所有内容归到「其他变更」。
+const { sections } = parseChangesFile(changes);
+const block = sections.length > 0
+  ? `## v${version} - ${date}\n\n${sections
+    .map((section) => `### ${section.title}\n\n${section.items.map((item) => `- ${item}`).join("\n")}`)
+    .join("\n\n")}\n`
+  : `## v${version} - ${date}\n\n- 本次发布仅重新打包，不包含功能变更。\n`;
 
 let existing = "";
 try {
