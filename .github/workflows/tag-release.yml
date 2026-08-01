@@ -1,0 +1,76 @@
+name: Tag Release
+
+# 打 tag（v* 形式，如 v1.0.57）并 push 到远程时自动编译、打包、生成发布说明并上传构建产物。
+#
+# 说明：本仓库未配置 Apple Developer 证书，因此采用 ad-hoc 签名（FUND_PULSE_ALLOW_ADHOC=1），
+# 产物仅用于验证「打 tag 时代码可编译、可打包」，NOT 经过公证，下载后会被 Gatekeeper 拦截，
+# 不适合对外分发。如需正式签名+公证的 DMG，请配置 Apple Developer 证书与 notary 凭据
+# （FUND_PULSE_SIGN_IDENTITY / notarytool profile）后移除该环境变量。
+#
+# 发版前请务必：
+#   1. 将 package.json 的 "version" 改为与 tag 一致的三段式（如 1.0.57，不能是 1.1）；
+#   2. 在 .release-notes/ 下为每个面向用户的改动新增片段（详见 .release-notes/README.md）。
+# 本 workflow 仅生成「发布说明预览」作为 artifact，不会修改仓库的 CHANGELOG.md 或消费片段。
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0 # 需要完整历史以定位上一个 tag
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Resolve version and previous tag
+        id: meta
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          PREV=$(git describe --tags --abbrev=0 "HEAD^" 2>/dev/null || echo "")
+          echo "previous-tag=$PREV" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: swift test
+
+      - name: Package (ad-hoc signed build artifact)
+        env:
+          FUND_PULSE_ALLOW_ADHOC: "1"
+        run: npm run package
+
+      - name: Generate release notes preview
+        env:
+          RELEASE_PREVIEW_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          RELEASE_PREVIEW_DATE="$(date +%F)" node scripts/generate-release-notes-preview.mjs
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fund-pulse-macos
+          path: |
+            release/swift/*.dmg
+            release/swift/*.zip
+          if-no-files-found: error
+
+      - name: Upload release notes preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-preview
+          path: RELEASE_NOTES_PREVIEW.md
+          if-no-files-found: ignore
