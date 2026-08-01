@@ -18,7 +18,7 @@ on:
       - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -52,19 +52,30 @@ jobs:
           FUND_PULSE_ALLOW_ADHOC: "1"
         run: npm run package
 
+      - name: List build output
+        if: always()
+        run: ls -lh release/swift/ || echo "release/swift not found"
+
       - name: Generate release notes preview
         env:
           RELEASE_PREVIEW_VERSION: ${{ steps.meta.outputs.version }}
         run: |
           RELEASE_PREVIEW_DATE="$(date +%F)" node scripts/generate-release-notes-preview.mjs
 
-      - name: Upload build artifact
+      - name: Upload DMG artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fund-pulse-macos
-          path: |
-            release/swift/*.dmg
-            release/swift/*.zip
+          name: fund-pulse-dmg
+          path: release/swift/*.dmg
+          if-no-files-found: warn
+
+      - name: Upload ZIP artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fund-pulse-zip
+          path: release/swift/*.zip
           if-no-files-found: error
 
       - name: Upload release notes preview
@@ -74,3 +85,18 @@ jobs:
           name: release-notes-preview
           path: RELEASE_NOTES_PREVIEW.md
           if-no-files-found: ignore
+
+      - name: Create GitHub Release with assets
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          # tag 即本次触发的 ref_name（如 v1.1.0）
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: |
+            release/swift/*.dmg
+            release/swift/*.zip
+          body_path: RELEASE_NOTES_PREVIEW.md
+          # ad-hoc 未公证产物仅用于自用/验证，预发布标记便于区分
+          prerelease: true
+          fail_on_unmatched_files: false
