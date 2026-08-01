@@ -292,7 +292,9 @@ enum PortfolioCalculator {
     }
 
     private static func dailyQuoteState(for quote: FundQuote, now: Date) -> DailyQuoteState {
-        guard TradingCalendar.isFundTradingDay(now) else { return .inactive }
+        // 周末与节假日无当日行情，完全沿用上一交易日的已结算数据（涨跌幅/收益不归零重置），
+        // 与「交易日 9:15 集合竞价之前」语义一致：quote 中保留的即最近一个交易日的收盘值。
+        guard TradingCalendar.isFundTradingDay(now) else { return .officialUpdated }
 
         // 9:15 集合竞价之前当日估值尚未产生，展示上一交易日的已结算收益（quote 中的净值即昨日收盘值）。
         if TradingCalendar.isBeforeDailyCallAuction(now: now) {

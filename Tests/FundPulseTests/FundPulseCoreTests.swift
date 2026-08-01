@@ -13744,13 +13744,14 @@ final class FundPulseCoreTests: XCTestCase {
         XCTAssertEqual(result.totalAmount, 110, accuracy: 0.0001)
         XCTAssertEqual(result.holdingIncome, 10, accuracy: 0.0001)
         XCTAssertEqual(result.holdingIncomeRate, 10, accuracy: 0.0001)
-        XCTAssertEqual(result.todayIncome, 0)
+        // 非交易日沿用上一交易日已结算涨跌幅（不再归零）
+        XCTAssertEqual(result.todayIncome, 9.1658, accuracy: 0.0001)
         XCTAssertEqual(result.pendingCount, 0)
         XCTAssertEqual(result.funds[0].status, .holding)
         XCTAssertEqual(result.funds[0].incomeStartDate, "2026-06-19")
         XCTAssertEqual(result.funds[0].migratedShares, 100)
         XCTAssertEqual(result.funds[0].migratedCost, 1)
-        XCTAssertEqual(result.funds[0].todayRate, 0)
+        XCTAssertEqual(result.funds[0].todayRate, 9.09, accuracy: 0.0001)
         XCTAssertEqual(result.funds[0].holdingRate ?? 0, 10, accuracy: 0.0001)
         XCTAssertEqual(result.funds[0].isIncomeActive, true)
     }
@@ -13896,10 +13897,11 @@ final class FundPulseCoreTests: XCTestCase {
             now: now
         )
 
-        XCTAssertEqual(result.todayIncome, 0)
-        XCTAssertEqual(result.todayIncomeRate, 0)
-        XCTAssertEqual(result.funds[0].todayIncome, 0)
-        XCTAssertEqual(result.funds[0].todayRate, 0)
+        // 节假日沿用上一交易日已结算涨跌幅（忽略 06-21 的盘中估值），不再归零
+        XCTAssertEqual(result.todayIncome, 9.1658, accuracy: 0.0001)
+        XCTAssertEqual(result.todayIncomeRate, 9.09, accuracy: 0.0001)
+        XCTAssertEqual(result.funds[0].todayIncome, 9.1658, accuracy: 0.0001)
+        XCTAssertEqual(result.funds[0].todayRate, 9.09, accuracy: 0.0001)
         XCTAssertFalse(result.funds[0].isUpdated)
         XCTAssertEqual(result.funds[0].dateText, "06-18 15:00")
     }
@@ -14946,7 +14948,8 @@ final class FundPulseCoreTests: XCTestCase {
         XCTAssertEqual(result.funds[0].status, .holding)
         XCTAssertEqual(result.funds[0].migratedShares, 150)
         XCTAssertEqual(result.funds[0].isIncomeActive, true)
-        XCTAssertEqual(result.todayIncome, 0)
+        // 非交易日沿用上一交易日已结算涨跌幅：仅已到收益起始日的 old lot 参与计算
+        XCTAssertEqual(result.todayIncome, 9.5238, accuracy: 0.0001)
     }
 
     @MainActor

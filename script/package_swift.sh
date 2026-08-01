@@ -181,7 +181,19 @@ elif [[ "$SIGN_IDENTITY" == Apple\ Development:* ]]; then
 fi
 
 if [[ -z "$SIGN_IDENTITY" ]]; then
-  cat >&2 <<'EOF'
+  if [[ "${FUND_PULSE_ALLOW_ADHOC:-0}" == "1" ]]; then
+    # CI / 无证书环境：允许 ad-hoc 签名，仅用于验证编译打包，产物无法对外正常分发
+    # （Gatekeeper 会拦截未公证的下载包）。本地正式发布请配置 Developer ID 证书。
+    SIGN_IDENTITY="-"
+    SIGNING_KIND="ad-hoc"
+    SKIP_NOTARY="1"
+    cat >&2 <<'EOF'
+warning: FUND_PULSE_ALLOW_ADHOC=1 set; using ad-hoc signing.
+This package is NOT notarized and will be blocked by Gatekeeper if downloaded.
+Use it only for CI build verification, not for public distribution.
+EOF
+  else
+    cat >&2 <<'EOF'
 error: no usable macOS signing identity found.
 
 Install an Apple Developer certificate, or set:
@@ -190,8 +202,10 @@ Install an Apple Developer certificate, or set:
 
 Unsigned/ad-hoc packages are intentionally refused because downloaded macOS
 apps can be blocked by Gatekeeper as damaged or untrusted.
+Set FUND_PULSE_ALLOW_ADHOC=1 to allow ad-hoc signing in CI only.
 EOF
-  exit 1
+    exit 1
+  fi
 fi
 
 if [[ "$SIGNING_KIND" == "custom" ]]; then
