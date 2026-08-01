@@ -100,3 +100,10 @@ jobs:
           # ad-hoc 未公证产物仅用于自用/验证，预发布标记便于区分
           prerelease: true
           fail_on_unmatched_files: false
+
+      - name: Archive release notes
+        if: success()
+        env:
+          RELEASE_PREVIEW_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          RELEASE_PREVIEW_DATE="$(date +%F)" node scripts/archive-release-notes.mjs

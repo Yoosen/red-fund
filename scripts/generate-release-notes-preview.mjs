@@ -20,17 +20,33 @@ async function readVersion() {
   return JSON.parse(raw).version;
 }
 
+async function readChangesFile() {
+  const changesPath = path.join(root, ".release-notes", "changes.md");
+  try {
+    const content = await readFile(changesPath, "utf8");
+    const trimmed = content.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 async function main() {
   const version = await readVersion();
   const date = (process.env.RELEASE_PREVIEW_DATE || new Date().toISOString().slice(0, 10));
   const fragmentsDir = path.join(root, ".release-notes");
 
   const { fragments } = await loadReleaseNoteFragments(fragmentsDir);
+  const manualNotes = await readChangesFile();
+
+  // 优先用固定单文件 changes.md；为空时回退到片段机制；再为空则允许空说明。
   const entry = buildChangelogEntry({
     version,
     date,
     fragments,
-    allowEmpty: true,
+    manualNotes: manualNotes ?? undefined,
+    allowEmpty: !manualNotes,
   });
 
   // 同时写文件（供 artifact 上传）并打印到日志。
