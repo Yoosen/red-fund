@@ -361,7 +361,14 @@ struct PortfolioPerformanceView: View {
                     }
 
                     ForEach(Array(grid.cells.enumerated()), id: \.offset) { _, date in
-                        PerformanceCalendarCell(date: date, record: date.flatMap { records[$0] }, hidesAmounts: hidesAmounts)
+                        // 周末与节假日不展示任何收益（沿用上一交易日的数据视为缓存，强制占位为“-”）。
+                        let recordForCell: PortfolioPerformanceDay? = date.flatMap { dateText in
+                            guard let day = DateOnlyFormatter.parse(dateText),
+                                  TradingCalendar.isFundTradingDay(day)
+                            else { return nil }
+                            return records[dateText]
+                        }
+                        PerformanceCalendarCell(date: date, record: recordForCell, hidesAmounts: hidesAmounts)
                     }
                 }
 
