@@ -273,6 +273,7 @@ enum PortfolioPerformanceCalendar {
     }
 
     /// 汇总某月的收益：统计该月每日盈亏总额、上涨/下跌天数、估值天数，供月份概览展示。
+    /// 非交易日（周末与法定休市）的缓存记录不纳入统计。
     static func summary(
         in snapshot: PortfolioPerformanceSnapshot,
         monthContaining date: Date
@@ -280,6 +281,9 @@ enum PortfolioPerformanceCalendar {
         let prefix = grid(monthContaining: date).monthKey + "-"
         let days = PortfolioPerformanceRecorder.normalized(snapshot).days.filter {
             $0.date.hasPrefix(prefix)
+            // 排除非交易日的缓存记录（周末/节假日不应产生收益）。
+            && DateOnlyFormatter.parse($0.date)
+                .map(TradingCalendar.isFundTradingDay) ?? false
         }
         return PortfolioPerformanceMonthSummary(
             days: days,

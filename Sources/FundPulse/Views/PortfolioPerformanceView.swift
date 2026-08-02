@@ -125,7 +125,7 @@ struct PortfolioPerformanceView: View {
             )
         }
         guard let start = store.snapshot.trackingStartDate else { return "按日记录组合净收益" }
-        return "自 \(start) 起 · \(store.snapshot.days.count) 个记录日"
+        return "自 \(start) 起 · \(tradingDayCount) 个记录日"
     }
 
     /// 按当前页切换内容：排行页显示今日收益排行面板，曲线/日历页显示收益图区块。
@@ -211,6 +211,20 @@ struct PortfolioPerformanceView: View {
         )
     }
 
+    /// 最后一个交易日记录（非交易日被视为缓存，不计入统计与展示）。
+    private var lastTradingDay: PortfolioPerformanceDay? {
+        store.snapshot.days.last { day in
+            DateOnlyFormatter.parse(day.date).map(TradingCalendar.isFundTradingDay) ?? false
+        }
+    }
+
+    /// 交易日记录总数（京东补全与本地记录中非交易日均不计入）。
+    private var tradingDayCount: Int {
+        store.snapshot.days.count { day in
+            DateOnlyFormatter.parse(day.date).map(TradingCalendar.isFundTradingDay) ?? false
+        }
+    }
+
     /// 顶部汇总行：记录期累计收益、最近记录日盈亏、记录天数三项指标。
     private var summaryRow: some View {
         HStack(spacing: 8) {
@@ -221,15 +235,15 @@ struct PortfolioPerformanceView: View {
             )
             PerformanceMetric(
                 title: "最近记录日",
-                value: amountText(store.snapshot.days.last?.profit ?? 0),
-                color: PortfolioPerformanceSemanticColor.color(for: store.snapshot.days.last?.profit ?? 0),
-                detail: store.snapshot.days.last?.returnRate.map {
+                value: amountText(lastTradingDay?.profit ?? 0),
+                color: PortfolioPerformanceSemanticColor.color(for: lastTradingDay?.profit ?? 0),
+                detail: lastTradingDay?.returnRate.map {
                     MoneyFormatter.percent($0, signed: true)
                 }
             )
             PerformanceMetric(
                 title: "记录天数",
-                value: "\(store.snapshot.days.count)",
+                value: "\(tradingDayCount)",
                 color: .primary
             )
         }
@@ -239,20 +253,21 @@ struct PortfolioPerformanceView: View {
     @ViewBuilder
     private var sourceSummary: some View {
         let jdCount = store.snapshot.days.count { $0.source == .jdFinance }
+        let localTradingDays = store.snapshot.days.count { $0.source == .localQuote && DateOnlyFormatter.parse($0.date).map(TradingCalendar.isFundTradingDay) ?? false }
         if jdCount > 0 {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.icloud")
                 Text("京东补全 \(jdCount) 天")
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
-                if store.snapshot.days.count > jdCount {
-                    Text("· 本地记录 \(store.snapshot.days.count - jdCount) 天")
+                if localTradingDays > 0 {
+                    Text("· 本地记录 \(localTradingDays) 天")
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                 }
                 Spacer(minLength: 0)
-                if let through = store.snapshot.jdFinanceSync?.coveredThrough {
-                    Text("截至 \(through)")
+                if let lastDate = lastTradingDay?.date {
+                    Text("截至 \(lastDate)")
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                 }
