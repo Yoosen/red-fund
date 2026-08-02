@@ -9,8 +9,9 @@ name: Tag Release
 #
 # 发版前请务必：
 #   1. 将 package.json 的 "version" 改为与 tag 一致的三段式（如 1.0.57，不能是 1.1）；
-#   2. 在 .release-notes/ 下为每个面向用户的改动新增片段（详见 .release-notes/README.md）。
-# 本 workflow 仅生成「发布说明预览」作为 artifact，不会修改仓库的 CHANGELOG.md 或消费片段。
+#   2. 在 .release-notes/changes.md 中维护本次发版说明（详见 .release-notes/README.md）。
+# 发版成功后本 workflow 会自动把 changes.md 内容追加到 .release-notes/archive.md 顶部，
+# 并清空 changes.md，随后将这两处改动 commit 回仓库供下次复用。
 
 on:
   push:
@@ -107,3 +108,17 @@ jobs:
           RELEASE_PREVIEW_VERSION: ${{ steps.meta.outputs.version }}
         run: |
           RELEASE_PREVIEW_DATE="$(date +%F)" node scripts/archive-release-notes.mjs
+
+      - name: Commit archived release notes
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .release-notes/archive.md .release-notes/changes.md
+          # 仅在 archive/changes 真的发生变动时提交，避免空提交触发额外 CI。
+          if git diff --cached --quiet; then
+            echo "archive.md / changes.md 无变更，跳过提交。"
+          else
+            git commit -m "chore: 归档 v${{ steps.meta.outputs.version }} 发布说明"
+            git push
+          fi
