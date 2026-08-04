@@ -22,12 +22,14 @@ struct SupportAuthorSection: View {
                 selection: $selectedAsset,
                 title: \SupportAuthorAsset.title,
                 tint: selectedAsset.tint,
-                accessibilityLabelText: "支付方式"
+                accessibilityLabelText: "支付方式",
+                enableArrowNavigation: false
             )
 
             SupportQRCodeImage(asset: selectedAsset)
                 .id(selectedAsset)
-                .frame(maxWidth: .infinity, maxHeight: 424)
+                .frame(maxWidth: .infinity, maxHeight: 320)
+                .aspectRatio(1, contentMode: .fit)
                 .transition(.opacity)
                 .animation(.easeOut(duration: 0.16), value: selectedAsset)
 

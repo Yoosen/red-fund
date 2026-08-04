@@ -301,6 +301,9 @@ struct PanelSegmentedPicker<Value: Hashable & Identifiable>: View {
     let title: (Value) -> String
     var tint: Color = PanelDesign.accent
     var accessibilityLabelText: String? = nil
+    /// 是否启用左右方向键导航。菜单栏 App 中某些场景下焦点会自动落在选择器上，
+    /// 持续的方向键事件会导致选中项反复跳变，此时应关闭。
+    var enableArrowNavigation: Bool = true
 
     /// 胶囊式分段选择器：点击切换选中并高亮，支持左右方向键导航。
     var body: some View {
@@ -343,6 +346,7 @@ struct PanelSegmentedPicker<Value: Hashable & Identifiable>: View {
         .focusable()
         .focusEffectDisabled()
         .onMoveCommand { direction in
+            guard enableArrowNavigation else { return }
             guard let currentIndex = values.firstIndex(of: selection) else { return }
             let nextIndex: Int
             switch direction {
