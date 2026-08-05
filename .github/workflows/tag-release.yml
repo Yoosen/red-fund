@@ -99,7 +99,7 @@ jobs:
             release/swift/*.zip
           body_path: RELEASE_NOTES_PREVIEW.md
           # ad-hoc 未公证产物仅用于自用/验证，预发布标记便于区分
-          prerelease: true
+          prerelease: false
           fail_on_unmatched_files: false
 
       - name: Archive release notes
@@ -120,5 +120,5 @@ jobs:
             echo "archive.md / changes.md 无变更，跳过提交。"
           else
             git commit -m "chore: 归档 v${{ steps.meta.outputs.version }} 发布说明"
-            git push
+            git push origin HEAD:main
           fi
