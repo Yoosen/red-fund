@@ -127,6 +127,10 @@ export async function loadReleaseNoteFragments(directory) {
     if (entry.name === "README.md" || entry.name === ".gitkeep" || !entry.name.endsWith(".md")) {
       continue;
     }
+    // .release-notes 目录下的聚合/汇总文件不是片段，跳过分片解析。
+    if (entry.name === "archive.md" || entry.name === "changes.md") {
+      continue;
+    }
     if (entry.name.includes("\n") || entry.name.includes("\r")) {
       throw new Error(`Release-note fragment has an unsafe file name: ${JSON.stringify(entry.name)}`);
     }
