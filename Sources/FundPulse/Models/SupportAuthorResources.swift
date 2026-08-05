@@ -34,7 +34,7 @@ enum SupportAuthorResources {
     /// 在 Bundle 的 Resources 或 Support 子目录中查找指定支付方式的收款二维码图片。
     static func url(
         for asset: SupportAuthorAsset,
-        bundle: Bundle = .module
+        bundle: Bundle = .fundPulseResources
     ) -> URL? {
         bundle.url(forResource: asset.rawValue, withExtension: "png")
             ?? bundle.url(
