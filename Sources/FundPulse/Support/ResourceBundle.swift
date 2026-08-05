@@ -1,24 +1,20 @@
 import Foundation
 
 extension Bundle {
-    /// 资源 bundle 的统一入口。
+    /// 资源 bundle 的统一入口，完全绕过 SwiftPM 自动生成的 `Bundle.module`。
     ///
-    /// SwiftPM 生成的 `Bundle.module` 在打包成 `.app` 后，
-    /// 其查找路径（`App根/FundPulse_FundPulse.bundle`）与实际拷贝位置
-    /// （`Contents/Resources/FundPulse_FundPulse.bundle`）可能不一致，
-    /// 导致非本机环境下找不到资源而崩溃。
-    /// 这里优先使用 `Bundle.module`，若其资源目录不存在则回退到
-    /// 标准 `Contents/Resources` 下的同名 bundle，保证打包产物可正常加载。
+    /// SwiftPM 生成的 `Bundle.module` 是 `static let`，初始化时只查
+    /// `App根/FundPulse_FundPulse.bundle` 与编译期绝对路径，两者在非本机打包
+    /// 环境下都不存在，会直接 `fatalError` 导致整个 App 启动即崩溃。
+    /// 这里直接从标准 `Contents/Resources` 目录查找同名 bundle，避免触发
+    /// `Bundle.module` 的初始化。
     static var fundPulseResources: Bundle {
-        let moduleBundle = Bundle.module
-        if FileManager.default.fileExists(atPath: moduleBundle.bundlePath) {
-            return moduleBundle
-        }
         if let url = Bundle.main.resourceURL?
             .appendingPathComponent("FundPulse_FundPulse.bundle"),
-            let fallback = Bundle(url: url) {
-            return fallback
+            let bundle = Bundle(url: url) {
+            return bundle
         }
-        return moduleBundle
+        // 兜底：返回主 bundle，资源缺失时各调用处的 `if let` 会安全降级
+        return .main
     }
 }
