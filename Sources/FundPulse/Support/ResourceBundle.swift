@@ -9,12 +9,16 @@ extension Bundle {
     /// 这里直接从标准 `Contents/Resources` 目录查找同名 bundle，避免触发
     /// `Bundle.module` 的初始化。
     static var fundPulseResources: Bundle {
+        // 1. 标准打包位置（CI/发布产物）：Contents/Resources 下的资源 bundle
         if let url = Bundle.main.resourceURL?
             .appendingPathComponent("FundPulse_FundPulse.bundle"),
             let bundle = Bundle(url: url) {
             return bundle
         }
-        // 兜底：返回主 bundle，资源缺失时各调用处的 `if let` 会安全降级
-        return .main
+        // 回退到 SwiftPM 生成的 Bundle.module（本机测试/debug 环境下可用）
+        // 注意：Bundle.module 在找不到资源时会 fatalError，因此仅在
+        // Contents/Resources 查找失败后才访问，而发布产物必定存在于
+        // Contents/Resources，不会走到这里。
+        return .module
     }
 }
