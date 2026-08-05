@@ -5493,8 +5493,6 @@ struct FundDetailView: View {
                     pendingTradeSummary
                     metricsGrid
                     trendSection
-                    historySection
-                    topHoldingsSection
                 }
                 .padding(.horizontal, 14)
                 .padding(.bottom, 12)
@@ -5695,17 +5693,26 @@ struct FundDetailView: View {
                 FundIntradayRateChart(points: visibleIntradayRatePoints)
                     .frame(height: 138)
             }
+
+            if !supplement.topHoldings.isEmpty || isSupplementLoading {
+                Divider().opacity(0.45)
+                topHoldingsList
+            }
         }
     }
 
     private var netValueTrendContent: some View {
         let trendPoints = netValueTrendPoints
         return VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(
-                "净值业绩走势",
-                trailing: latestNetValuePoint.map { "最新净值 \(numberText($0.value, places: 4))" },
-                showsLoading: isSupplementLoading
-            )
+            VStack(alignment: .leading, spacing: 2) {
+                sectionHeader(
+                    "净值业绩走势",
+                    trailing: latestNetValuePoint.map { "最新净值 \(numberText($0.value, places: 4))" },
+                    showsLoading: isSupplementLoading
+                )
+
+                netValueRangeReturnView(for: trendPoints)
+            }
 
             if trendPoints.count >= 2 {
                 FundTrendMiniChart(points: trendPoints, tradeMarkers: netValueTradeMarkers)
@@ -5716,10 +5723,47 @@ struct FundDetailView: View {
             }
 
             netValueTrendRangePicker
+
+            if !historyRows.isEmpty || isSupplementLoading {
+                Divider().opacity(0.45)
+                historyList
+            }
         }
     }
 
-    private var historySection: some View {
+    private func netValueRangeReturnView(for points: [FundNetValuePoint]) -> some View {
+        let returnText: String? = {
+            guard points.count >= 2,
+                  let first = points.first,
+                  let last = points.last,
+                  first.value > 0 else { return nil }
+            let rate = (last.value - first.value) / first.value
+            return MoneyFormatter.percent(rate * 100, signed: true)
+        }()
+
+        return Group {
+            if let text = returnText {
+                let rate = parseSignedPercent(text)
+                HStack(spacing: 6) {
+                    Spacer(minLength: 0)
+                    Text("涨跌幅 ")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text(text)
+                        .font(.system(size: 10, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(toneColor(for: rate))
+                }
+            }
+        }
+    }
+
+    private func parseSignedPercent(_ text: String) -> Double {
+        let cleaned = text.replacingOccurrences(of: "%", with: "")
+        return Double(cleaned) ?? 0
+    }
+
+    private var historyList: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("历史净值", trailing: historyTrailingText, showsLoading: isSupplementLoading)
 
@@ -5748,12 +5792,9 @@ struct FundDetailView: View {
                 }
             }
         }
-        .padding(12)
-        .background(PanelDesign.cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
-    private var topHoldingsSection: some View {
+    private var topHoldingsList: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("前10重仓股", trailing: topHoldingsTrailingText, showsLoading: isSupplementLoading)
 
@@ -5772,9 +5813,6 @@ struct FundDetailView: View {
                 }
             }
         }
-        .padding(12)
-        .background(PanelDesign.cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(PanelDesign.border(cornerRadius: 10))
     }
 
     private var actionBar: some View {
