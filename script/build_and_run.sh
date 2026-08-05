@@ -54,7 +54,7 @@ rm -rf "$DIST_DIR/FundPulse.app"
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
-cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME"
+cp -R "$RESOURCE_BUNDLE" "$APP_BUNDLE/$RESOURCE_BUNDLE_NAME"
 chmod +x "$APP_BINARY"
 if [[ -f "$APP_ICON" ]]; then
   cp "$APP_ICON" "$APP_RESOURCES/FundPulse.icns"
@@ -129,7 +129,7 @@ case "$MODE" in
     ;;
   --verify|verify)
     for resource in alipay-support.png wechat-support.png; do
-      if ! find "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME" -type f -name "$resource" -print -quit | grep -q .; then
+      if ! find "$APP_BUNDLE/$RESOURCE_BUNDLE_NAME" -type f -name "$resource" -print -quit | grep -q .; then
         echo "error: bundled support resource not found: $resource" >&2
         exit 1
       fi
