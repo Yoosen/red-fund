@@ -33,6 +33,21 @@ async function readChangesFile() {
   }
 }
 
+// 读取上一个 tag（用于生成版本间代码差异对比链接）。
+// 优先取环境变量（CI 传入），否则回退用 git 定位 HEAD^ 的最近 tag。
+async function readPreviousTag() {
+  if (process.env.RELEASE_PREVIEW_PREVIOUS_TAG) return process.env.RELEASE_PREVIEW_PREVIOUS_TAG;
+  try {
+    const { execFileSync } = await import("node:child_process");
+    return execFileSync("git", ["describe", "--tags", "--abbrev=0", "HEAD^"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim() || "";
+  } catch {
+    return "";
+  }
+}
+
 // 把解析出的分类 sections 渲染成按「标题」分组的 Markdown 块。
 function renderClassifiedSections(sections) {
   return sections
@@ -62,6 +77,14 @@ async function main() {
       fragments,
       allowEmpty: true,
     });
+  }
+
+  // 追加「上一个版本 → 当前版本」的代码差异对比链接（与原作者 releases 一致）。
+  const previousTag = await readPreviousTag();
+  if (previousTag) {
+    const tag = `v${version}`;
+    const url = `https://github.com/Yoosen/red-fund/compare/${encodeURIComponent(previousTag)}...${encodeURIComponent(tag)}`;
+    entry = `${entry.trimEnd()}\n\n## 代码变更\n\n[查看 ${previousTag} → ${tag} 的完整代码差异](${url})\n`;
   }
 
   // 同时写文件（供 artifact 上传）并打印到日志。

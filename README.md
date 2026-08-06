@@ -155,7 +155,7 @@ Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、�
 
 ```bash
 git clone https://github.com/Yoosen/red-fund.git
-cd fund-pulse
+cd red-fund
 swift build
 swift test
 ```

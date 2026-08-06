@@ -60,6 +60,7 @@ jobs:
       - name: Generate release notes preview
         env:
           RELEASE_PREVIEW_VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_PREVIEW_PREVIOUS_TAG: ${{ steps.meta.outputs.previous-tag }}
         run: |
           RELEASE_PREVIEW_DATE="$(date +%F)" node scripts/generate-release-notes-preview.mjs
 
@@ -93,7 +94,7 @@ jobs:
         with:
           # tag 即本次触发的 ref_name（如 v1.1.0）
           tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          name: fund-pulse ${{ github.ref_name }}
           files: |
             release/swift/*.dmg
             release/swift/*.zip
