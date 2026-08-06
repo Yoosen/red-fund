@@ -10,22 +10,22 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/iamzjt-front-end/fund-pulse/releases/latest"><img src="https://img.shields.io/github/v/release/iamzjt-front-end/fund-pulse?display_name=tag&amp;sort=semver&amp;style=flat-square&amp;label=Release&amp;color=ff5968" alt="最新版本"></a>
+  <a href="https://github.com/Yoosen/red-fund/releases/latest"><img src="https://img.shields.io/github/v/release/Yoosen/red-fund?display_name=tag&amp;sort=semver&amp;style=flat-square&amp;label=Release&amp;color=ff5968" alt="最新版本"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B-111827?style=flat-square&amp;logo=apple&amp;logoColor=white" alt="macOS 14 或更高版本">
   <img src="https://img.shields.io/badge/Apple%20Silicon-M1%2B-111827?style=flat-square&amp;logo=apple&amp;logoColor=white" alt="支持 Apple Silicon">
-  <a href="https://github.com/iamzjt-front-end/fund-pulse/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/iamzjt-front-end/fund-pulse/test.yml?branch=main&amp;style=flat-square&amp;label=CI" alt="持续集成状态"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/github/license/iamzjt-front-end/fund-pulse?style=flat-square&amp;label=License" alt="GPL-3.0 许可证"></a>
-  <a href="https://github.com/iamzjt-front-end/fund-pulse/stargazers"><img src="https://img.shields.io/github/stars/iamzjt-front-end/fund-pulse?style=flat-square&amp;logo=github&amp;label=Stars" alt="GitHub Stars"></a>
+  <a href="https://github.com/Yoosen/red-fund/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/Yoosen/red-fund/test.yml?branch=main&amp;style=flat-square&amp;label=CI" alt="持续集成状态"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/Yoosen/red-fund?style=flat-square&amp;label=License" alt="GPL-3.0 许可证"></a>
+  <a href="https://github.com/Yoosen/red-fund/stargazers"><img src="https://img.shields.io/github/stars/Yoosen/red-fund?style=flat-square&amp;logo=github&amp;label=Stars" alt="GitHub Stars"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/iamzjt-front-end/fund-pulse/releases/latest"><img src="https://img.shields.io/badge/下载最新版-DMG-ff5968?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="下载最新版 DMG"></a>
+  <a href="https://github.com/Yoosen/red-fund/releases/latest"><img src="https://img.shields.io/badge/下载最新版-DMG-ff5968?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="下载最新版 DMG"></a>
   &nbsp;
   <a href="./CHANGELOG.md">更新记录</a>
   ·
   <a href="./PRIVACY.md">隐私政策</a>
   ·
-  <a href="https://github.com/iamzjt-front-end/fund-pulse/issues">问题与建议</a>
+  <a href="https://github.com/Yoosen/red-fund/issues">问题与建议</a>
 </p>
 
 > [!IMPORTANT]
@@ -61,19 +61,41 @@ Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、�
   <img src="./screenshots/readme-detail-dark.png" width="320" alt="深色模式下的示例基金详情">
 </p>
 
+## 项目说明与免责声明
+
+- 本项目基于 iamzjt-front-end/fund-pulse 二次开发，已对原有功能做了较多改动与扩展。
+- 本仓库版本与原作者版本相互独立，功能、构建与发布均由本仓库维护，与原作者无关。
+- Fund Pulse 是个人基金记录与信息展示工具，不连接券商执行交易，也不构成投资建议。盘中估值来自第三方公开数据，可能延迟、缺失或与最终官方净值不同。
+- 本软件仅供个人学习与研究使用，请遵守所在地区相关法律法规与平台服务条款。
+
 ## 安装
 
 系统要求：**macOS 14 Sonoma 或更高版本**，**Apple Silicon（M1 或更新芯片）**。
 
-1. 打开 [Latest Release](https://github.com/iamzjt-front-end/fund-pulse/releases/latest)。
+1. 打开 [Latest Release](https://github.com/Yoosen/red-fund/releases/latest)。
 2. 下载名称以 `arm64-swift.dmg` 结尾的安装包。
 3. 打开 DMG，将 `fund-pulse.app` 拖入“应用程序”。
 4. 启动后在菜单栏找到 Fund Pulse 图标；应用不会在 Dock 常驻。
 
 当前未提供 Intel、Homebrew Cask 或 Mac App Store 版本。请只从本仓库 Release 下载。
 
-> [!TIP]
-> 如果 macOS 首次启动时提示无法验证开发者，请先确认安装包来自本仓库，然后在 Finder 中按住 Control 单击应用并选择“打开”，或按“系统设置 > 隐私与安全性”中的系统提示处理。
+### 没有 Apple 开发者证书时如何运行
+
+本仓库发布的安装包未使用付费的 Apple Developer ID 签名，也未经过 Apple 公证（Notarization）。macOS 的 Gatekeeper 会因此拦截应用，直接双击打开会提示“无法验证开发者”或“已损坏”。请按以下步骤运行：
+
+1. 从本仓库 Release 下载并打开 DMG，将 fund-pulse.app 拖入“应用程序”文件夹。
+2. 首次打开时若被系统拦截，请先在 Finder 中选中 fund-pulse.app，按住 Control 键单击（或右键），选择「打开」，在弹出的对话框中再次点击「打开」。
+3. 若上述方式仍被拦截，可到系统设置 > 隐私与安全性，在“安全性”区域会出现被拦截的提示，点击「仍要打开」即可。
+4. 如提示应用“已损坏，无法打开”，可在终端执行以下命令移除隔离属性后再打开：
+
+   xattr -cr /Applications/fund-pulse.app
+
+   说明：xattr -cr 只是清除 macOS 给从网络下载的文件加上的隔离标记，不会修改应用内容。仅在你确认安装包来自本仓库 Release 时执行。
+
+5. 以后从“应用程序”正常启动即可，无需重复上述步骤。
+
+> [!WARNING]
+> 没有开发者证书与公证意味着系统无法验证应用来源。请务必只从本仓库 Release 下载，不要运行来路不明的安装包。
 
 ## 快速开始
 
@@ -132,7 +154,7 @@ Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、�
 开发环境需要 macOS 14+、Xcode / Command Line Tools 和 Swift 6。Node.js `>= 22.8`、npm `>= 10.9` 仅用于仓库脚本与发布工具。
 
 ```bash
-git clone https://github.com/iamzjt-front-end/fund-pulse.git
+git clone https://github.com/Yoosen/red-fund.git
 cd fund-pulse
 swift build
 swift test
@@ -148,9 +170,9 @@ npm run dev
 
 欢迎提交可复现的问题、范围明确的建议和聚焦的 Pull Request。
 
-- [报告 Bug](https://github.com/iamzjt-front-end/fund-pulse/issues/new?template=issue_template_bug.md)
-- [提出功能建议](https://github.com/iamzjt-front-end/fund-pulse/issues/new?template=issue_template_feature.md)
-- [查看已有 Issues](https://github.com/iamzjt-front-end/fund-pulse/issues)
+- [报告 Bug](https://github.com/Yoosen/red-fund/issues/new?template=issue_template_bug.md)
+- [提出功能建议](https://github.com/Yoosen/red-fund/issues/new?template=issue_template_feature.md)
+- [查看已有 Issues](https://github.com/Yoosen/red-fund/issues)
 
 提交代码前请先搜索已有 Issue，并为非平凡业务改动补充测试。用户可见变更应添加 `.release-notes/*.md`，提交前至少运行 `swift test` 和与改动相关的仓库测试。
 
@@ -160,7 +182,7 @@ Fund Pulse 免费、开源且无广告。如果它对你有帮助，欢迎点亮
 
 ## 项目成长
 
-<a href="https://github.com/iamzjt-front-end/fund-pulse/stargazers">
+<a href="https://github.com/Yoosen/red-fund/stargazers">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./screenshots/star-growth-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="./screenshots/star-growth-light.svg">
