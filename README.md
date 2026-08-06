@@ -79,7 +79,7 @@ Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、�
 
 当前未提供 Intel、Homebrew Cask 或 Mac App Store 版本。请只从本仓库 Release 下载。
 
-### 没有 Apple 开发者证书时如何运行
+## 运行
 
 本仓库发布的安装包未使用付费的 Apple Developer ID 签名，也未经过 Apple 公证（Notarization）。macOS 的 Gatekeeper 会因此拦截应用，直接双击打开会提示“无法验证开发者”或“已损坏”。请按以下步骤运行：
 
