@@ -161,6 +161,35 @@ final class PortfolioPerformanceTests: XCTestCase {
             false
         )
 
+        // 海外/QDII 基金产生「当日」但北京时间开盘前的估算（如 04:00）时，
+        // 不应阻止 A 股基金官方净值确认。
+        let domesticConfirmed = FundQuote(
+            code: "000001",
+            name: "测试基金",
+            netValue: 1.1,
+            estimatedNetValue: 1.1,
+            growthRate: 0.2,
+            estimateTime: "2026-07-28 15:00",
+            netValueDate: "2026-07-28"
+        )
+        let qdiiTodayOverseasEstimate = FundQuote(
+            code: "012920",
+            name: "QDII基金",
+            netValue: 3.8989,
+            estimatedNetValue: 4.0528,
+            growthRate: 0.19,
+            estimateTime: "2026-07-28 04:00",
+            netValueDate: "2026-07-27"
+        )
+        XCTAssertEqual(
+            PortfolioPerformanceRecorder.quoteConfirmationState(
+                portfolio: snapshot,
+                quotes: ["000001": domesticConfirmed, "012920": qdiiTodayOverseasEstimate],
+                now: now
+            ),
+            true
+        )
+
         // 全部基金行情都滞后（如非交易日）时仍不记录。
         let staleDomestic = FundQuote(
             code: "000001",
@@ -295,17 +324,17 @@ final class PortfolioPerformanceTests: XCTestCase {
         XCTAssertEqual(PortfolioPerformanceSeries.points(in: snapshot, range: .all, through: end).count, 6)
     }
 
-    func testMonthGridUsesMondayFirstAndHandlesLeapFebruary() throws {
+    func testMonthGridUsesSundayFirstAndHandlesLeapFebruary() throws {
         let grid = PortfolioPerformanceCalendar.grid(
             monthContaining: try shanghaiDate("2024-02-20 12:00")
         )
 
         XCTAssertEqual(grid.monthKey, "2024-02")
         XCTAssertEqual(grid.cells.count, 35)
-        XCTAssertEqual(Array(grid.cells.prefix(3)), [nil, nil, nil])
-        XCTAssertEqual(grid.cells[3], "2024-02-01")
-        XCTAssertEqual(grid.cells[31], "2024-02-29")
-        XCTAssertEqual(Array(grid.cells.suffix(3)), [nil, nil, nil])
+        XCTAssertEqual(Array(grid.cells.prefix(4)), [nil, nil, nil, nil])
+        XCTAssertEqual(grid.cells[4], "2024-02-01")
+        XCTAssertEqual(grid.cells[32], "2024-02-29")
+        XCTAssertEqual(Array(grid.cells.suffix(2)), [nil, nil])
     }
 
     func testCalendarMonthSummaryDoesNotLeakAdjacentMonthRecords() throws {
@@ -315,7 +344,7 @@ final class PortfolioPerformanceTests: XCTestCase {
             days: [
                 day("2026-06-30", profit: 100, updatedAt: update),
                 day("2026-07-01", profit: 10, updatedAt: update),
-                day("2026-07-02", profit: -3, status: .estimated, updatedAt: update),
+                day("2026-07-02", profit: -3, updatedAt: update),
                 day("2026-08-01", profit: 50, updatedAt: update)
             ]
         )
@@ -328,7 +357,7 @@ final class PortfolioPerformanceTests: XCTestCase {
         XCTAssertEqual(summary.totalProfit, 7)
         XCTAssertEqual(summary.riseDays, 1)
         XCTAssertEqual(summary.fallDays, 1)
-        XCTAssertEqual(summary.estimatedDays, 1)
+        XCTAssertEqual(summary.estimatedDays, 0)
         XCTAssertEqual(summary.days.map(\.date), ["2026-07-01", "2026-07-02"])
     }
 
@@ -450,8 +479,9 @@ final class PortfolioPerformanceTests: XCTestCase {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = PortfolioPerformanceStore(dataDirectory: directory)
-        let first = try shanghaiDate("2026-07-15 10:00")
-        let later = try shanghaiDate("2026-07-15 10:01")
+        let todayString = DateOnlyFormatter.string(from: Date())
+        let first = try shanghaiDate("\(todayString) 10:00")
+        let later = try shanghaiDate("\(todayString) 10:01")
 
         XCTAssertTrue(
             store.record(
@@ -468,6 +498,36 @@ final class PortfolioPerformanceTests: XCTestCase {
             )
         )
         XCTAssertEqual(store.snapshot.days.count, 1)
+        XCTAssertEqual(store.snapshot.days.first?.updatedAt, first)
+    }
+
+    /// 历史交易日一旦被回填为「已确认」，再次写入相同估值不应回退状态。
+    @MainActor
+    func testPastEstimatedRecordIsBackfilledToConfirmed() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = PortfolioPerformanceStore(dataDirectory: directory)
+        let first = try shanghaiDate("2026-07-15 10:00")
+        let later = try shanghaiDate("2026-07-15 10:01")
+
+        XCTAssertTrue(
+            store.record(
+                portfolio: portfolio(todayIncome: 20, todayIncomeRate: 0.5),
+                now: first,
+                allQuotesConfirmed: false
+            )
+        )
+        XCTAssertEqual(store.snapshot.days.first?.status, .estimated)
+
+        XCTAssertTrue(
+            store.record(
+                portfolio: portfolio(todayIncome: 20, todayIncomeRate: 0.5),
+                now: later,
+                allQuotesConfirmed: false
+            )
+        )
+        XCTAssertEqual(store.snapshot.days.count, 1)
+        XCTAssertEqual(store.snapshot.days.first?.status, .confirmed)
         XCTAssertEqual(store.snapshot.days.first?.updatedAt, first)
     }
 

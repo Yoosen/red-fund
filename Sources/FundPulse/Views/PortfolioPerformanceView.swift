@@ -61,8 +61,7 @@ struct PortfolioPerformanceView: View {
                 systemImage: "chart.line.uptrend.xyaxis",
                 title: "持仓收益",
                 subtitle: headerSubtitle,
-                accessoryText: hasVisibleEstimate ? "含估值" : nil,
-                accessoryColor: .orange,
+                accessoryText: nil,
                 actionSystemImage: showsJDFinanceCompletionAction ? "arrow.down.circle" : nil,
                 actionTitle: showsJDFinanceCompletionAction ? "京东补全" : nil,
                 actionTint: .blue,
@@ -187,21 +186,6 @@ struct PortfolioPerformanceView: View {
         PortfolioPerformanceSeries.cumulativePoints(in: store.snapshot)
     }
 
-    /// 当前页是否包含估值数据（用于标题栏“含估值”标识）。
-    private var hasVisibleEstimate: Bool {
-        switch page {
-        case .ranking:
-            false
-        case .curve:
-            visiblePoints.contains { $0.day.status == .estimated }
-        case .calendar:
-            PortfolioPerformanceCalendar.summary(
-                in: store.snapshot,
-                monthContaining: displayedMonth
-            ).estimatedDays > 0
-        }
-    }
-
     /// 当前时间范围内的可见收益曲线点（截至最近记录日）。
     private var visiblePoints: [PortfolioPerformancePoint] {
         PortfolioPerformanceSeries.points(
@@ -303,15 +287,6 @@ struct PortfolioPerformanceView: View {
                     HStack {
                         Text(visiblePoints.first?.day.date ?? "--")
                         Spacer()
-                        chartLegendItem(
-                            "正收益",
-                            color: PortfolioPerformanceSemanticColor.positive
-                        )
-                        chartLegendItem(
-                            "负收益",
-                            color: PortfolioPerformanceSemanticColor.negative
-                        )
-                        Spacer()
                         Text(visiblePoints.last?.day.date ?? "--")
                     }
                     .font(.system(size: 9, weight: .medium))
@@ -319,19 +294,6 @@ struct PortfolioPerformanceView: View {
                 }
             }
         }
-    }
-
-    /// 图表图例单项：标题 + 对应语义色的小圆点。
-    private func chartLegendItem(_ title: String, color: Color) -> some View {
-        Label {
-            Text(title)
-                .foregroundStyle(.primary)
-        } icon: {
-            Circle()
-                .fill(color)
-                .frame(width: 7, height: 7)
-        }
-        .accessibilityElement(children: .combine)
     }
 
     /// 每日盈亏日历区块：翻月按钮、月汇总、星期表头与日期网格，无记录时显示提示。
@@ -359,16 +321,16 @@ struct PortfolioPerformanceView: View {
                         .foregroundStyle(PortfolioPerformanceSemanticColor.positive)
                     Text("跌 \(summary.fallDays) 天")
                         .foregroundStyle(PortfolioPerformanceSemanticColor.negative)
-                    if summary.estimatedDays > 0 {
-                        Text("估值 \(summary.estimatedDays) 天")
-                            .foregroundStyle(.orange)
+                    if summary.localQuoteDays > 0 {
+                        Text("本地记录 \(summary.localQuoteDays) 天")
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .font(.system(size: 10, weight: .semibold))
                 .padding(.horizontal, 2)
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
-                    ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { title in
+                    ForEach(["日", "一", "二", "三", "四", "五", "六"], id: \.self) { title in
                         Text(title)
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(.secondary)
@@ -561,95 +523,48 @@ private struct PortfolioCumulativeProfitChart: View {
     let points: [PortfolioPerformancePoint]
     let hidesAmounts: Bool
 
-    /// 用 Canvas 绘制累计收益曲线：网格线、零线、按盈亏色调分段着色，叠加坐标轴标签与 ¥0 标记。
+    @State private var hoverLocation: CGPoint?
+    @State private var hoverIndex: Int?
+
+    /// 用 Canvas 绘制累计收益曲线：网格线、零线、按盈亏色调分段着色，叠加悬停提示。
     var body: some View {
         let values = points.map(\.cumulativeProfit)
         let scale = PortfolioPerformanceChartScale(values: values)
-        let axisLabels = PortfolioPerformanceChartAxisLabels(values: values, scale: scale)
+        let cumulativeRates = cumulativeReturnRates
 
         ZStack(alignment: .topLeading) {
             Canvas { context, size in
-                for fraction in [0.0, 0.5, 1.0] {
-                    let y = size.height * fraction
-                    var line = Path()
-                    line.move(to: CGPoint(x: 0, y: y))
-                    line.addLine(to: CGPoint(x: size.width, y: y))
-                    context.stroke(line, with: .color(.secondary.opacity(0.13)), style: StrokeStyle(lineWidth: 0.6, dash: [3, 3]))
-                }
-
-                let location: (Int, Double) -> CGPoint = { index, value in
-                    let x = points.count == 1 ? size.width / 2 : size.width * CGFloat(index) / CGFloat(points.count - 1)
-                    let y = size.height * CGFloat(scale.normalizedY(for: value))
-                    return CGPoint(x: x, y: y)
-                }
-
-                let zeroY = size.height * CGFloat(scale.normalizedY(for: 0))
-                var zeroLine = Path()
-                zeroLine.move(to: CGPoint(x: 0, y: zeroY))
-                zeroLine.addLine(to: CGPoint(x: size.width, y: zeroY))
-                context.stroke(
-                    zeroLine,
-                    with: .color(.secondary.opacity(0.48)),
-                    style: StrokeStyle(lineWidth: 1, dash: [5, 3])
-                )
-
-                if points.count == 1 {
-                    let center = location(0, points[0].cumulativeProfit)
-                    context.fill(
-                        Path(ellipseIn: CGRect(x: center.x - 3, y: center.y - 3, width: 6, height: 6)),
-                        with: .color(PortfolioPerformanceSemanticColor.color(for: points[0].cumulativeProfit))
-                    )
-                } else {
-                    for index in 1..<points.count {
-                        let startValue = points[index - 1].cumulativeProfit
-                        let endValue = points[index].cumulativeProfit
-                        let startPoint = location(index - 1, startValue)
-                        let endPoint = location(index, endValue)
-                        for portion in PortfolioPerformanceChartColor.segmentPortions(
-                            from: startValue,
-                            to: endValue
-                        ) {
-                            var segment = Path()
-                            segment.move(to: interpolatedPoint(
-                                from: startPoint,
-                                to: endPoint,
-                                fraction: portion.startFraction
-                            ))
-                            segment.addLine(to: interpolatedPoint(
-                                from: startPoint,
-                                to: endPoint,
-                                fraction: portion.endFraction
-                            ))
-                            context.stroke(
-                                segment,
-                                with: .color(color(for: portion.tone)),
-                                style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
-                            )
-                        }
-                    }
-                }
+                drawGrid(context: context, size: size)
+                drawZeroLine(context: context, size: size, scale: scale)
+                drawCurve(context: context, size: size, scale: scale)
+                drawHoverIndicator(context: context, size: size, scale: scale)
             }
             .padding(.vertical, 15)
+            .overlay(mouseTrackingOverlay)
 
             GeometryReader { geometry in
                 let plotHeight = max(geometry.size.height - 30, 1)
-                let zeroY = 15 + plotHeight * CGFloat(scale.normalizedY(for: 0))
-                Text("¥0")
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 3)
-                    .background(PanelDesign.cardBackground.opacity(0.92), in: Capsule())
-                    .position(x: 14, y: min(max(zeroY - 8, 8), geometry.size.height - 8))
+
+                if let hoverIndex, hoverIndex >= 0, hoverIndex < points.count {
+                    hoverTooltip(
+                        at: hoverIndex,
+                        size: geometry.size,
+                        plotHeight: plotHeight,
+                        scale: scale,
+                        cumulativeRates: cumulativeRates
+                    )
+                }
             }
             .allowsHitTesting(false)
 
-            VStack(alignment: .leading) {
-                if let maximum = axisLabels.maximum {
-                    Text(axisText(maximum))
-                }
-                Spacer()
-                if let minimum = axisLabels.minimum {
-                    Text(axisText(minimum))
+            // 区间总收益 = 区间内每日盈亏之和（而非全量累计曲线末端值），
+            // 这样切换 1月/3月/6月/1年 时该数值会随区间变化。
+            let intervalProfit = points.reduce(0) { $0 + $1.day.profit }
+            let latestRate = cumulativeRates.last ?? nil
+
+            VStack(alignment: .leading, spacing: 2) {
+                if points.count > 0 {
+                    axisLabel(value: intervalProfit, rate: latestRate, color: PortfolioPerformanceSemanticColor.color(for: intervalProfit))
                 }
             }
             .font(.system(size: 9, weight: .medium, design: .rounded))
@@ -658,6 +573,205 @@ private struct PortfolioCumulativeProfitChart: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("累计收益曲线")
         .accessibilityValue(chartAccessibilityValue)
+    }
+
+    /// 坐标轴标签：金额 + 对应累计收益率。
+    private func axisLabel(value: Double, rate: Double?, color: Color? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(axisText(value))
+                .foregroundStyle(color ?? .secondary)
+            if let rate {
+                Text(MoneyFormatter.percent(rate, signed: true))
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle((color ?? .secondary).opacity(0.8))
+            }
+        }
+    }
+
+    /// 鼠标跟踪覆盖层，用于捕获悬停位置。
+    private var mouseTrackingOverlay: some View {
+        GeometryReader { geometry in
+            MouseTrackingOverlay(location: $hoverLocation)
+                .onChange(of: hoverLocation) { _, newValue in
+                    updateHoverIndex(location: newValue, size: geometry.size)
+                }
+        }
+    }
+
+    /// 更新当前悬停数据索引。
+    private func updateHoverIndex(location: CGPoint?, size: CGSize) {
+        guard let location, size.width > 0, points.count > 0 else {
+            hoverIndex = nil
+            return
+        }
+        guard location.y >= 0, location.y <= size.height else {
+            hoverIndex = nil
+            return
+        }
+        if points.count == 1 {
+            hoverIndex = 0
+        } else {
+            let index = Int(round(location.x / size.width * CGFloat(points.count - 1)))
+            hoverIndex = min(max(index, 0), points.count - 1)
+        }
+    }
+
+    /// 悬停提示视图。
+    private func hoverTooltip(
+        at index: Int,
+        size: CGSize,
+        plotHeight: CGFloat,
+        scale: PortfolioPerformanceChartScale,
+        cumulativeRates: [Double?]
+    ) -> some View {
+        let point = points[index]
+        let x = points.count == 1 ? size.width / 2 : size.width * CGFloat(index) / CGFloat(points.count - 1)
+        let y = 15 + plotHeight * CGFloat(scale.normalizedY(for: point.cumulativeProfit))
+
+        let tooltip = VStack(alignment: .leading, spacing: 3) {
+            Text(point.day.date)
+                .font(.system(size: 10, weight: .semibold))
+            if !hidesAmounts {
+                Text(MoneyFormatter.money(point.cumulativeProfit, signed: true))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(PortfolioPerformanceSemanticColor.color(for: point.cumulativeProfit))
+            }
+            if let dailyRate = point.day.returnRate {
+                HStack(spacing: 3) {
+                    Text("当日")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text(MoneyFormatter.percent(dailyRate, signed: true))
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(PortfolioPerformanceSemanticColor.color(for: dailyRate))
+                }
+            }
+            if let cumulativeRate = cumulativeRates[index] {
+                HStack(spacing: 3) {
+                    Text("累计")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text(MoneyFormatter.percent(cumulativeRate, signed: true))
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(PortfolioPerformanceSemanticColor.color(for: cumulativeRate))
+                }
+            }
+        }
+        .padding(8)
+        .background(
+            PanelDesign.cardBackground.opacity(0.96),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.secondary.opacity(0.15), lineWidth: 0.7)
+        )
+        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 3)
+
+        // 默认显示在数据点右上方；接近右边缘时移到左侧，接近上边缘时翻到下方。
+        let tooltipWidth: CGFloat = 118
+        let tooltipHeight: CGFloat = hidesAmounts && point.day.returnRate == nil && cumulativeRates[index] == nil ? 34 : 86
+        let fitsOnRight = x + tooltipWidth + 16 <= size.width
+        let xPos = fitsOnRight ? x + 10 + tooltipWidth / 2 : x - 10 - tooltipWidth / 2
+        let yPos = y - tooltipHeight / 2 - 10 < 0 ? y + tooltipHeight / 2 + 10 : y - tooltipHeight / 2 - 10
+
+        return tooltip
+            .frame(width: tooltipWidth, alignment: .leading)
+            .position(x: min(max(xPos, tooltipWidth / 2 + 4), size.width - tooltipWidth / 2 - 4), y: yPos)
+    }
+
+    // MARK: - Drawing helpers
+
+    private func drawGrid(context: GraphicsContext, size: CGSize) {
+        for fraction in [0.0, 0.5, 1.0] {
+            let y = size.height * fraction
+            var line = Path()
+            line.move(to: CGPoint(x: 0, y: y))
+            line.addLine(to: CGPoint(x: size.width, y: y))
+            context.stroke(line, with: .color(.secondary.opacity(0.13)), style: StrokeStyle(lineWidth: 0.6, dash: [3, 3]))
+        }
+    }
+
+    private func drawZeroLine(context: GraphicsContext, size: CGSize, scale: PortfolioPerformanceChartScale) {
+        let zeroY = size.height * CGFloat(scale.normalizedY(for: 0))
+        var zeroLine = Path()
+        zeroLine.move(to: CGPoint(x: 0, y: zeroY))
+        zeroLine.addLine(to: CGPoint(x: size.width, y: zeroY))
+        context.stroke(
+            zeroLine,
+            with: .color(.secondary.opacity(0.48)),
+            style: StrokeStyle(lineWidth: 1, dash: [5, 3])
+        )
+    }
+
+    private func drawCurve(context: GraphicsContext, size: CGSize, scale: PortfolioPerformanceChartScale) {
+        let location: (Int, Double) -> CGPoint = { index, value in
+            let x = points.count == 1 ? size.width / 2 : size.width * CGFloat(index) / CGFloat(points.count - 1)
+            let y = size.height * CGFloat(scale.normalizedY(for: value))
+            return CGPoint(x: x, y: y)
+        }
+
+        if points.count == 1 {
+            let center = location(0, points[0].cumulativeProfit)
+            context.fill(
+                Path(ellipseIn: CGRect(x: center.x - 3, y: center.y - 3, width: 6, height: 6)),
+                with: .color(PortfolioPerformanceSemanticColor.color(for: points[0].cumulativeProfit))
+            )
+        } else {
+            for index in 1..<points.count {
+                let startValue = points[index - 1].cumulativeProfit
+                let endValue = points[index].cumulativeProfit
+                let startPoint = location(index - 1, startValue)
+                let endPoint = location(index, endValue)
+                for portion in PortfolioPerformanceChartColor.segmentPortions(
+                    from: startValue,
+                    to: endValue
+                ) {
+                    var segment = Path()
+                    segment.move(to: interpolatedPoint(
+                        from: startPoint,
+                        to: endPoint,
+                        fraction: portion.startFraction
+                    ))
+                    segment.addLine(to: interpolatedPoint(
+                        from: startPoint,
+                        to: endPoint,
+                        fraction: portion.endFraction
+                    ))
+                    context.stroke(
+                        segment,
+                        with: .color(color(for: portion.tone)),
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                    )
+                }
+            }
+        }
+    }
+
+    private func drawHoverIndicator(context: GraphicsContext, size: CGSize, scale: PortfolioPerformanceChartScale) {
+        guard let hoverIndex, hoverIndex >= 0, hoverIndex < points.count else { return }
+        let point = points[hoverIndex]
+        let x = points.count == 1 ? size.width / 2 : size.width * CGFloat(hoverIndex) / CGFloat(points.count - 1)
+        let y = size.height * CGFloat(scale.normalizedY(for: point.cumulativeProfit))
+
+        var verticalLine = Path()
+        verticalLine.move(to: CGPoint(x: x, y: 0))
+        verticalLine.addLine(to: CGPoint(x: x, y: size.height))
+        context.stroke(
+            verticalLine,
+            with: .color(.secondary.opacity(0.25)),
+            style: StrokeStyle(lineWidth: 0.8, dash: [4, 3])
+        )
+
+        context.fill(
+            Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
+            with: .color(PortfolioPerformanceSemanticColor.color(for: point.cumulativeProfit))
+        )
+        context.stroke(
+            Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
+            with: .color(PanelDesign.panelBackground),
+            style: StrokeStyle(lineWidth: 2)
+        )
     }
 
     /// 坐标轴文本：隐藏金额时返回掩码，否则格式化为带符号金额。
@@ -683,13 +797,73 @@ private struct PortfolioCumulativeProfitChart: View {
         PortfolioPerformanceSemanticColor.color(for: tone)
     }
 
-    /// 曲线无障碍描述：起止日期 + 累计收益（隐藏时说明金额已隐藏）。
+    /// 曲线无障碍描述：起止日期 + 区间总收益（隐藏时说明金额已隐藏）。
     private var chartAccessibilityValue: String {
         guard let first = points.first, let last = points.last else { return "暂无数据" }
-        let amount = hidesAmounts ? "金额已隐藏" : MoneyFormatter.money(last.cumulativeProfit, signed: true)
-        return "从 \(first.day.date) 到 \(last.day.date)，累计收益 \(amount)"
+        let intervalProfit = points.reduce(0) { $0 + $1.day.profit }
+        let amount = hidesAmounts ? "金额已隐藏" : MoneyFormatter.money(intervalProfit, signed: true)
+        return "从 \(first.day.date) 到 \(last.day.date)，区间收益 \(amount)"
+    }
+
+    // MARK: - Return rate helpers
+
+    /// 累计收益率序列（由每日收益率连乘得到）。
+    private var cumulativeReturnRates: [Double?] {
+        var result: [Double?] = []
+        var cumulative: Double = 0
+        for point in points {
+            if let rate = point.day.returnRate {
+                let decimalRate = rate / 100
+                cumulative = (1 + cumulative) * (1 + decimalRate) - 1
+                result.append(cumulative * 100)
+            } else {
+                result.append(nil)
+            }
+        }
+        return result
     }
 }
+
+#if canImport(AppKit)
+/// 透明覆盖层，用于跟踪鼠标在视图中的位置。
+private struct MouseTrackingOverlay: NSViewRepresentable {
+    @Binding var location: CGPoint?
+
+    func makeNSView(context: Context) -> NSView {
+        let view = TrackingView()
+        view.onMouseMoved = { location in
+            self.location = location
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class TrackingView: NSView {
+        var onMouseMoved: ((CGPoint?) -> Void)?
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            trackingAreas.forEach { removeTrackingArea($0) }
+            let trackingArea = NSTrackingArea(
+                rect: bounds,
+                options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+                owner: self,
+                userInfo: nil
+            )
+            addTrackingArea(trackingArea)
+        }
+
+        override func mouseMoved(with event: NSEvent) {
+            onMouseMoved?(convert(event.locationInWindow, from: nil))
+        }
+
+        override func mouseExited(with event: NSEvent) {
+            onMouseMoved?(nil)
+        }
+    }
+}
+#endif
 
 private struct PerformanceCalendarCell: View {
     let date: String?

@@ -10,6 +10,14 @@ enum PortfolioPerformanceRecorder {
         var updatedAt: Date
     }
 
+    /// 判断基金估值时间是否为海外/QDII 基金在北京时间开盘前产生的估算（如 04:00）。
+    /// 这类估值不应阻止 A 股基金当日官方净值的确认。
+    private static func isOverseasPreMarketEstimateTime(_ estimateTime: String) -> Bool {
+        let parts = estimateTime.split(separator: " ")
+        guard parts.count == 2, parts[1].count >= 5 else { return false }
+        return parts[1].prefix(5) < "09:30"
+    }
+
     /// 判断行情确认状态：行情滞后的基金（如 QDII 净值 T+1 披露、估值时间非当日）不参与当日判定；
     /// 其余活跃持仓都有当日官方净值则返 `true`，均有当日估值则返 `false`；行情缺失或全部滞后则返 `nil`。
     static func quoteConfirmationState(
@@ -33,6 +41,11 @@ enum PortfolioPerformanceRecorder {
             // 行情滞后的基金（如 QDII 净值 T+1 披露）不参与当日判定，
             // 避免一只基金长期否决整个组合的收益记录。
             guard isConfirmed || isEstimated else { continue }
+            // 海外/QDII 基金在官方净值追平前会产生北京时间开盘前的估算（如 04:00），
+            // 这类估算不代表 A 股当日行情，应跳过。
+            if !isConfirmed, isEstimated, isOverseasPreMarketEstimateTime(quote.estimateTime) {
+                continue
+            }
             freshQuoteCount += 1
             allConfirmed = allConfirmed && isConfirmed
         }
@@ -148,13 +161,36 @@ enum PortfolioPerformanceRecorder {
             localRecordingStartDate = validLocalRecordingStart
         }
 
-        return PortfolioPerformanceSnapshot(
+        var normalized = PortfolioPerformanceSnapshot(
             schemaVersion: PortfolioPerformanceSnapshot.currentSchemaVersion,
             trackingStartDate: trackingStartDate,
             localRecordingStartDate: localRecordingStartDate,
             days: days,
             jdFinanceSync: snapshot.jdFinanceSync
         )
+        backfillConfirmedStatus(in: &normalized, now: Date())
+        return normalized
+    }
+
+    /// 将历史交易日中仍标记为「估值」的记录升级为「已确认」：
+    /// 非当日的交易日一旦过去，A 股基金官方净值理应已披露，不应再显示橙色圆点。
+    /// 保留原更新时间，避免无意义地触发重复持久化。
+    private static func backfillConfirmedStatus(
+        in snapshot: inout PortfolioPerformanceSnapshot,
+        now: Date
+    ) {
+        let today = DateOnlyFormatter.string(from: now)
+        for index in snapshot.days.indices {
+            let day = snapshot.days[index]
+            guard day.status == .estimated,
+                  day.date < today,
+                  let date = DateOnlyFormatter.parse(day.date),
+                  TradingCalendar.isFundTradingDay(date)
+            else {
+                continue
+            }
+            snapshot.days[index].status = .confirmed
+        }
     }
 
     /// 判断候选记录是否应覆盖已有记录：京东已确认记录优先于本地估值；已确认优先于估值；同状态则按更新时间较新者覆盖。
@@ -217,6 +253,8 @@ enum PortfolioPerformanceSeries {
     ) -> Date? {
         let component: DateComponents
         switch range {
+        case .oneWeek:
+            component = DateComponents(day: -7)
         case .oneMonth:
             component = DateComponents(month: -1)
         case .threeMonths:
@@ -233,16 +271,16 @@ enum PortfolioPerformanceSeries {
 }
 
 enum PortfolioPerformanceCalendar {
-    /// 返回以上海时区、周一为每周首日的公历日历，作为所有收益日期计算的基准。
+    /// 返回以上海时区、周日为每周首日的公历日历，作为所有收益日期计算的基准。
     static var shanghaiCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "zh_CN")
         calendar.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? .current
-        calendar.firstWeekday = 2
+        calendar.firstWeekday = 1
         return calendar
     }
 
-    /// 生成某日期所在月份的日历网格：计算前置空白（按周一为首日）、日期单元格与后置空白，供收益日历展示。
+    /// 生成某日期所在月份的日历网格：计算前置空白（按周日为首日）、日期单元格与后置空白，供收益日历展示。
     static func grid(monthContaining date: Date) -> PortfolioPerformanceMonthGrid {
         let calendar = shanghaiCalendar
         guard let monthStart = monthStart(containing: date),
@@ -290,7 +328,8 @@ enum PortfolioPerformanceCalendar {
             totalProfit: days.reduce(0) { $0 + $1.profit },
             riseDays: days.count { $0.profit > 0 },
             fallDays: days.count { $0.profit < 0 },
-            estimatedDays: days.count { $0.status == .estimated }
+            estimatedDays: days.count { $0.status == .estimated },
+            localQuoteDays: days.count { $0.source == .localQuote }
         )
     }
 

@@ -278,8 +278,9 @@ enum PortfolioPerformanceChartColor {
     }
 }
 
-/// 收益图表可选择的日期范围（1 月/3 月/6 月/1 年/全部）。
+/// 收益图表可选择的日期范围（1 周/1 月/3 月/6 月/1 年/全部）。
 enum PortfolioPerformanceRange: String, CaseIterable, Identifiable, Sendable {
+    case oneWeek
     case oneMonth
     case threeMonths
     case sixMonths
@@ -292,6 +293,8 @@ enum PortfolioPerformanceRange: String, CaseIterable, Identifiable, Sendable {
     /// 范围中文标题。
     var title: String {
         switch self {
+        case .oneWeek:
+            "1周"
         case .oneMonth:
             "1月"
         case .threeMonths:
@@ -318,5 +321,8 @@ struct PortfolioPerformanceMonthSummary: Equatable, Sendable {
     var totalProfit: Double
     var riseDays: Int
     var fallDays: Int
+    /// 估值天数：当天未获取到完整官方净值的天数（当晚官方净值更新后即转为已确认，不再计为估值）。
     var estimatedDays: Int
+    /// 本地记录天数：未同步京东金融、由本机行情刷新写入的天数。
+    var localQuoteDays: Int
 }
