@@ -3,8 +3,34 @@ name: Test
 on:
   pull_request:
     branches: [main, dev]
+    paths-ignore:
+      - '**/*.md'
+      - '.release-notes/**'
+      - 'docs/**'
+      - 'screenshots/**'
+      - 'build/**'
+      - 'LICENSE'
+      - 'PRIVACY.md'
+      - 'RELEASE_NOTES_PREVIEW.md'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.svg'
+      - '**/*.ico'
   push:
     branches: [main, dev]
+    paths-ignore:
+      - '**/*.md'
+      - '.release-notes/**'
+      - 'docs/**'
+      - 'screenshots/**'
+      - 'build/**'
+      - 'LICENSE'
+      - 'PRIVACY.md'
+      - 'RELEASE_NOTES_PREVIEW.md'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.svg'
+      - '**/*.ico'
 
 jobs:
   swift:
