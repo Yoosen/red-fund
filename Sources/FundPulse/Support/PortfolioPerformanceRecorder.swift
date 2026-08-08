@@ -220,10 +220,15 @@ enum PortfolioPerformanceRecorder {
 
 enum PortfolioPerformanceSeries {
     /// 生成累计收益曲线点：按日期顺序累加每日收益，得到每个时点的累计收益。
+    /// 与收益日历保持一致，仅保留交易日记录，避免周末/节假日脏数据出现在曲线上。
     static func cumulativePoints(
         in snapshot: PortfolioPerformanceSnapshot
     ) -> [PortfolioPerformancePoint] {
         let days = PortfolioPerformanceRecorder.normalized(snapshot).days
+            .filter { day in
+                guard let date = DateOnlyFormatter.parse(day.date) else { return false }
+                return TradingCalendar.isFundTradingDay(date)
+            }
         var runningTotal = 0.0
         return days.map { day in
             runningTotal += day.profit

@@ -632,9 +632,9 @@ private struct PortfolioCumulativeProfitChart: View {
             Text(point.day.date)
                 .font(.system(size: 10, weight: .semibold))
             if !hidesAmounts {
-                Text(MoneyFormatter.money(point.cumulativeProfit, signed: true))
+                Text(MoneyFormatter.money(point.day.profit, signed: true))
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(PortfolioPerformanceSemanticColor.color(for: point.cumulativeProfit))
+                    .foregroundStyle(PortfolioPerformanceSemanticColor.color(for: point.day.profit))
             }
             if let dailyRate = point.day.returnRate {
                 HStack(spacing: 3) {
@@ -797,12 +797,11 @@ private struct PortfolioCumulativeProfitChart: View {
         PortfolioPerformanceSemanticColor.color(for: tone)
     }
 
-    /// 曲线无障碍描述：起止日期 + 区间总收益（隐藏时说明金额已隐藏）。
+    /// 曲线无障碍描述：起止日期 + 最近一日当日收益（隐藏时说明金额已隐藏）。
     private var chartAccessibilityValue: String {
         guard let first = points.first, let last = points.last else { return "暂无数据" }
-        let intervalProfit = points.reduce(0) { $0 + $1.day.profit }
-        let amount = hidesAmounts ? "金额已隐藏" : MoneyFormatter.money(intervalProfit, signed: true)
-        return "从 \(first.day.date) 到 \(last.day.date)，区间收益 \(amount)"
+        let amount = hidesAmounts ? "金额已隐藏" : MoneyFormatter.money(last.day.profit, signed: true)
+        return "从 \(first.day.date) 到 \(last.day.date)，最近记录日收益 \(amount)"
     }
 
     // MARK: - Return rate helpers
