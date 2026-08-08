@@ -17,7 +17,7 @@ import {
 const validFragment = (type, body) => `---\ntype: ${type}\n---\n\n${body}\n`;
 
 async function withTempDirectory(run) {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "fund-pulse-release-notes-test-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "red-fund-release-notes-test-"));
   try {
     return await run(directory);
   } finally {
@@ -30,10 +30,10 @@ function releaseContext(overrides = {}) {
     version: "1.0.42",
     tag: "v1.0.42",
     previousTag: "v1.0.41",
-    repository: "iamzjt-front-end/fund-pulse",
+    repository: "yoosen/red-fund",
     assets: {
-      zip: { name: "fund-pulse-1.0.42-arm64-swift.zip", sha256: "zip-sha" },
-      dmg: { name: "fund-pulse-1.0.42-arm64-swift.dmg", sha256: "dmg-sha" },
+      zip: { name: "red-fund-1.0.42-arm64-swift.zip", sha256: "zip-sha" },
+      dmg: { name: "red-fund-1.0.42-arm64-swift.dmg", sha256: "dmg-sha" },
       feed: { name: "latest-mac.yml", sha256: "feed-sha" },
     },
     ...overrides,
@@ -168,7 +168,7 @@ test("builds categorized release notes in stable product-facing order", () => {
   }
   assert.match(notes, /- 新增结构化发布说明。/);
   assert.match(notes, /ZIP SHA-256：zip-sha/);
-  assert.match(notes, /\[v1\.0\.41\.\.\.v1\.0\.42\]\(https:\/\/github\.com\/iamzjt-front-end\/fund-pulse\/compare\/v1\.0\.41\.\.\.v1\.0\.42\)/);
+  assert.match(notes, /\[v1\.0\.41\.\.\.v1\.0\.42\]\(https:\/\/github\.com\/yoosen\/red-fund/compare\/v1\.0\.41\.\.\.v1\.0\.42\)/);
 });
 
 test("sorts entries by source within each category", () => {

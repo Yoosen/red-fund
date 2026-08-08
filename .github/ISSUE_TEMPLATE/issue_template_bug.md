@@ -3,7 +3,7 @@ name: 反馈BUG
 about: 使用此模版反馈使用中遇见的问题.
 ---
 
-### fund-pulse 版本号
+### Red Fund 版本号
 
 ### 操作系统平台及版本号
 

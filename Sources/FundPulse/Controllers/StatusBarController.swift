@@ -14,15 +14,15 @@ import UniformTypeIdentifiers
 @preconcurrency import UserNotifications
 
 // 操作提醒通知的固定标识符（及应用内前缀，用于批量识别与清理）
-private let operationReminderNotificationID = "fund-pulse.operation-reminder"
+private let operationReminderNotificationID = "red-fund.operation-reminder"
 // 基金阈值提醒"上次发送时间"在 UserDefaults 中的存储键
-private let fundThresholdReminderLastSentDefaultsKey = "fund-pulse.threshold-reminder.last-sent-times"
+private let fundThresholdReminderLastSentDefaultsKey = "red-fund.threshold-reminder.last-sent-times"
 private let operationReminderNotificationPrefix = "\(operationReminderNotificationID)."
 // 外观切换时用于盖一层的过渡遮罩视图标识符
-private let appearanceTransitionOverlayIdentifier = NSUserInterfaceItemIdentifier("fund-pulse.appearance-transition-overlay")
+private let appearanceTransitionOverlayIdentifier = NSUserInterfaceItemIdentifier("red-fund.appearance-transition-overlay")
 // 专门记录"状态栏更新检查"相关日志的 Logger
 private let statusBarUpdateLogger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "com.iamzjt.frontend.fund-pulse.swift",
+    subsystem: Bundle.main.bundleIdentifier ?? "com.iamzjt.frontend.red-fund.swift",
     category: "AppUpdate"
 )
 
@@ -584,7 +584,7 @@ final class StatusBarController: NSObject {
 
     private func makeDebugPerformanceStore() -> PortfolioPerformanceStore {
         let directory = FileManager.default.temporaryDirectory
-            .appending(path: "fund-pulse-performance-preview-\(UUID().uuidString)")
+            .appending(path: "red-fund-performance-preview-\(UUID().uuidString)")
         let previewStore = PortfolioPerformanceStore(dataDirectory: directory)
         let sample = SampleExperienceFactory.make()
         let days = sample.dailyPerformance.enumerated().map { index, item in
@@ -624,7 +624,7 @@ final class StatusBarController: NSObject {
     func updateStatusTitle(animated: Bool = false) {
         let presentation = currentStatusTitlePresentation()
         guard let button = statusItem.button else { return }
-        button.toolTip = "fund-pulse"
+        button.toolTip = "red-fund"
         button.image = statusPulseImage
         button.imagePosition = .imageLeft
         button.attributedTitle = NSAttributedString(
@@ -1953,7 +1953,7 @@ final class StatusBarController: NSObject {
         let menu = NSMenu()
         menu.delegate = self
 
-        menu.addItem(disabledMenuItem("fund-pulse v\(appVersion)")) // 顶部版本号（禁用项）
+        menu.addItem(disabledMenuItem("red-fund v\(appVersion)")) // 顶部版本号（禁用项）
         menu.addItem(.separator())
 
         menu.addItem(NSMenuItem(title: "刷新基金数据", action: #selector(refreshFromMenu), keyEquivalent: "r"))
@@ -2244,7 +2244,7 @@ final class StatusBarController: NSObject {
         let panel = NSOpenPanel()
         panel.title = "导入基金配置"
         panel.prompt = "导入"
-        panel.message = "选择 fund-pulse 导出的 JSON 配置文件。"
+        panel.message = "选择 red-fund 导出的 JSON 配置文件。"
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -2290,9 +2290,9 @@ final class StatusBarController: NSObject {
         NSApp.terminate(nil)
     }
 
-    // 导出文件默认名：fund-pulse-portfolio-<日期>.json
+    // 导出文件默认名：red-fund-portfolio-<日期>.json
     private func defaultFundConfigurationFileName() -> String {
-        "fund-pulse-portfolio-\(DateOnlyFormatter.string(from: .now)).json"
+        "red-fund-portfolio-\(DateOnlyFormatter.string(from: .now)).json"
     }
 
     // 通用错误弹窗（导入/导出失败等）

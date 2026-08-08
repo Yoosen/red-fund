@@ -4,17 +4,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(node -p "require('./package.json').version")"
 ARCH="$(uname -m)"
-APP_BUNDLE="$ROOT_DIR/dist/fund-pulse.app"
+APP_BUNDLE="$ROOT_DIR/dist/Red Fund.app"
 OUT_DIR="$ROOT_DIR/release/swift"
 WORK_DIR="$OUT_DIR/dmg-root"
-ZIP_PATH="$OUT_DIR/fund-pulse-$VERSION-$ARCH-swift.zip"
-DMG_PATH="$OUT_DIR/fund-pulse-$VERSION-$ARCH-swift.dmg"
-RW_DMG_PATH="$OUT_DIR/fund-pulse-$VERSION-$ARCH-swift-rw.dmg"
-NOTARY_ZIP_PATH="$OUT_DIR/fund-pulse-$VERSION-$ARCH-swift-notary.zip"
-VOLUME_NAME="Fund Pulse $VERSION-$ARCH"
+ZIP_PATH="$OUT_DIR/red-fund-$VERSION-$ARCH-swift.zip"
+DMG_PATH="$OUT_DIR/red-fund-$VERSION-$ARCH-swift.dmg"
+RW_DMG_PATH="$OUT_DIR/red-fund-$VERSION-$ARCH-swift-rw.dmg"
+NOTARY_ZIP_PATH="$OUT_DIR/red-fund-$VERSION-$ARCH-swift-notary.zip"
+VOLUME_NAME="Red Fund $VERSION-$ARCH"
 APP_FILE_NAME="$(basename "$APP_BUNDLE")"
 SIGN_IDENTITY="${FUND_PULSE_SIGN_IDENTITY:-}"
-NOTARY_PROFILE="${FUND_PULSE_NOTARY_PROFILE:-fund-pulse}"
+NOTARY_PROFILE="${FUND_PULSE_NOTARY_PROFILE:-red-fund}"
 SKIP_NOTARY="${FUND_PULSE_SKIP_NOTARY:-0}"
 SKIP_DMG_LAYOUT="${FUND_PULSE_SKIP_DMG_LAYOUT:-0}"
 SIGNING_KIND="custom"
@@ -261,7 +261,7 @@ if [[ "$SKIP_NOTARY" != "1" ]]; then
 fi
 
 ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_PATH"
-cp -R "$APP_BUNDLE" "$WORK_DIR/fund-pulse.app"
+cp -R "$APP_BUNDLE" "$WORK_DIR/$APP_FILE_NAME"
 ln -s /Applications "$WORK_DIR/Applications"
 
 create_dmg

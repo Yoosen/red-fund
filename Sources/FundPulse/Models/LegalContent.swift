@@ -33,7 +33,7 @@ enum LegalContent {
     /// 更新日期文本。
     static let updatedAtText = "更新日期：2026 年 7 月 21 日"
     /// 引导语。
-    static let introduction = "Fund Pulse 是一款本地优先的基金持仓与行情查看工具。请在使用前阅读并理解以下说明。"
+    static let introduction = "Red Fund 是一款本地优先的基金持仓与行情查看工具。请在使用前阅读并理解以下说明。"
 
     /// 声明各章节内容（本地数据、第三方行情、京东同步、更新、支持、不收集项、删除、免责等）。
     static let sections: [Section] = [
@@ -41,7 +41,7 @@ enum LegalContent {
             id: "local-data",
             title: "本地保存的数据",
             paragraphs: [
-                "Fund Pulse 没有自有账号系统。你的持仓与偏好默认保存在当前 Mac 的 Application Support/fund-pulse 目录中，不会上传到 Fund Pulse 自有服务器。"
+                "Red Fund 没有自有账号系统。你的持仓与偏好默认保存在当前 Mac 的 Application Support/red-fund 目录中，不会上传到 Red Fund 自有服务器。"
             ],
             bullets: [
                 "portfolio.json：基金持仓、金额或份额、成本与收益、待确认操作、交易记录及京东同步状态等。",
@@ -67,7 +67,7 @@ enum LegalContent {
             title: "可选的京东金融同步",
             paragraphs: [
                 "只有在你主动使用京东金融登录或同步功能时，应用才会读取 WebKit 中属于京东相关域名的登录 Cookie，并仅向京东相关服务发送完成鉴权所需的最小 Cookie 集，以读取你的基金持仓、交易记录和历史收益记录。",
-                "Fund Pulse 不会把京东 Cookie 发送到自有服务器、行情服务商或 GitHub。你可以随时在“设置 > 数据 > 京东会话”中清除京东登录数据。"
+                "Red Fund 不会把京东 Cookie 发送到自有服务器、行情服务商或 GitHub。你可以随时在“设置 > 数据 > 京东会话”中清除京东登录数据。"
             ]
         ),
         Section(
@@ -81,12 +81,12 @@ enum LegalContent {
             id: "voluntary-support",
             title: "自愿支持作者",
             paragraphs: [
-                "“设置 > 支持”会切换展示完整的微信与支付宝收款海报；海报及其中的二维码是随应用分发的本地静态资源。Fund Pulse 不会因为你查看该区域或扫码而向自有服务器发送信息。",
+                "“设置 > 支持”会切换展示完整的微信与支付宝收款海报；海报及其中的二维码是随应用分发的本地静态资源。Red Fund 不会因为你查看该区域或扫码而向自有服务器发送信息。",
                 "“设置 > 关于 > 联系作者”展示的微信个人二维码同样是本地静态资源，查看本身不会触发网络请求；扫码和添加好友由微信处理。"
             ],
             bullets: [
                 "支持完全自愿，不会解锁额外功能，也不提供赞助者权益。",
-                "支付由微信或支付宝处理；Fund Pulse 不读取、上传或保存支付信息。"
+                "支付由微信或支付宝处理；Red Fund 不读取、上传或保存支付信息。"
             ]
         ),
         Section(
@@ -103,7 +103,7 @@ enum LegalContent {
             title: "保存期限与数据删除",
             paragraphs: [
                 "本地数据会一直保留，直到你主动清除。设置中的“清空所有持仓”可删除本地基金列表、待确认操作、交易记录、组合收益历史和当前收益汇总；“设置 > 数据 > 京东会话”可清除京东登录数据。",
-                "macOS 删除应用本体不一定会同时删除 Application Support 数据。如需彻底删除全部本地数据，请退出 Fund Pulse 后删除 ~/Library/Application Support/fund-pulse 目录；操作前请自行备份需要保留的数据。"
+                "macOS 删除应用本体不一定会同时删除 Application Support 数据。如需彻底删除全部本地数据，请退出 Red Fund 后删除 ~/Library/Application Support/red-fund 目录；操作前请自行备份需要保留的数据。"
             ]
         ),
         Section(
@@ -111,14 +111,14 @@ enum LegalContent {
             title: "行情与投资免责声明",
             paragraphs: [
                 "应用展示的盘中估值是依据第三方数据进行的估算，不是基金管理人公布的官方净值。行情、净值、持仓披露和计算结果可能存在延迟、缺失或错误。",
-                "Fund Pulse 仅用于个人记录与信息参考，不构成投资建议、要约、招揽或交易依据，不承诺数据完整准确，也不承诺任何投资收益。投资决策及其损失由你自行承担。"
+                "Red Fund 仅用于个人记录与信息参考，不构成投资建议、要约、招揽或交易依据，不承诺数据完整准确，也不承诺任何投资收益。投资决策及其损失由你自行承担。"
             ]
         ),
         Section(
             id: "third-party-independence",
             title: "第三方独立性",
             paragraphs: [
-                "Fund Pulse 是独立开发的第三方工具，与东方财富、腾讯、同花顺、京东、GitHub、微信、支付宝、基金公司及销售机构不存在隶属、代理、认可或合作关系。第三方名称和商标归各自权利人所有。"
+                "Red Fund 是独立开发的第三方工具，与东方财富、腾讯、同花顺、京东、GitHub、微信、支付宝、基金公司及销售机构不存在隶属、代理、认可或合作关系。第三方名称和商标归各自权利人所有。"
             ]
         )
     ]

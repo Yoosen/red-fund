@@ -3,8 +3,8 @@ set -euo pipefail
 
 MODE="${1:-run}"
 EXECUTABLE_NAME="FundPulse"
-APP_NAME="fund-pulse"
-BUNDLE_ID="com.iamzjt.frontend.fund-pulse.swift"
+APP_NAME="Red Fund"
+BUNDLE_ID="com.yoosen.red-fund.swift"
 MIN_SYSTEM_VERSION="14.0"
 BUILD_CONFIGURATION="${FUND_PULSE_BUILD_CONFIGURATION:-debug}"
 
@@ -51,6 +51,7 @@ if [[ ! -d "$RESOURCE_BUNDLE" ]]; then
 fi
 
 rm -rf "$DIST_DIR/FundPulse.app"
+rm -rf "$DIST_DIR/red-fund.app"
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
@@ -70,9 +71,9 @@ cat >"$INFO_PLIST" <<PLIST
   <key>CFBundleIdentifier</key>
   <string>$BUNDLE_ID</string>
   <key>CFBundleName</key>
-  <string>$APP_NAME</string>
+  <string>Red Fund</string>
   <key>CFBundleDisplayName</key>
-  <string>fund-pulse</string>
+  <string>Red Fund</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>

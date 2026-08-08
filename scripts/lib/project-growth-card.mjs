@@ -200,7 +200,7 @@ export function renderGrowthCard(data, { theme, iconDataURI }) {
     throw new Error(`Unsupported growth-card theme: ${theme}`);
   }
   if (!iconDataURI?.startsWith("data:image/")) {
-    throw new Error("A data URI for the Fund Pulse icon is required");
+    throw new Error("A data URI for the Red Fund icon is required");
   }
 
   const history = data.history.length > 0 ? data.history : [{ date: utcDate(new Date()), value: 0 }];
@@ -216,7 +216,7 @@ export function renderGrowthCard(data, { theme, iconDataURI }) {
   ];
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="410" viewBox="0 0 1100 410" role="img" aria-labelledby="title description" data-theme="${theme}">
-  <title id="title">Fund Pulse 项目成长卡</title>
+  <title id="title">Red Fund 项目成长卡</title>
   <desc id="description">${escapeXML(`${data.repository} 当前 ${data.stars} Stars，展示从首个 Star 到现在的累计增长趋势`)}</desc>
   <defs>
     <linearGradient id="area-${theme}" x1="0" y1="0" x2="0" y2="1">
@@ -232,7 +232,7 @@ export function renderGrowthCard(data, { theme, iconDataURI }) {
   <rect x="1" y="1" width="1098" height="408" rx="22" fill="${palette.background}" stroke="${palette.border}" stroke-width="2"/>
   <rect x="24" y="20" width="1052" height="108" rx="18" fill="${palette.panel}"/>
   <image x="40" y="34" width="74" height="74" href="${escapeXML(iconDataURI)}" clip-path="url(#icon-${theme})"/>
-  <text x="132" y="63" fill="${palette.text}" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="24" font-weight="750">Fund Pulse</text>
+  <text x="132" y="63" fill="${palette.text}" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="24" font-weight="750">Red Fund</text>
   <text x="132" y="87" fill="${palette.muted}" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14">${escapeXML(data.repository)}</text>
   <text x="132" y="108" fill="${palette.muted}" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12">${escapeXML(data.description || "原生 macOS 基金收益助手")}</text>
   <g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
@@ -285,7 +285,7 @@ export async function generateGrowthCards({
   const requestHeaders = {
     accept: "application/vnd.github+json",
     authorization: `Bearer ${token}`,
-    "user-agent": "fund-pulse-growth-card",
+    "user-agent": "red-fund-growth-card",
     "x-github-api-version": "2026-03-10",
   };
   const apiBase = `https://api.github.com/repos/${repository}`;

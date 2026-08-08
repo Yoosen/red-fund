@@ -68,7 +68,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fund-pulse-dmg
+          name: red-fund-dmg
           path: release/swift/*.dmg
           if-no-files-found: warn
 
@@ -76,7 +76,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fund-pulse-zip
+          name: red-fund-zip
           path: release/swift/*.zip
           if-no-files-found: error
 
@@ -94,7 +94,7 @@ jobs:
         with:
           # tag 即本次触发的 ref_name（如 v1.1.0）
           tag_name: ${{ github.ref_name }}
-          name: fund-pulse ${{ github.ref_name }}
+          name: Red Fund ${{ github.ref_name }}
           files: |
             release/swift/*.dmg
             release/swift/*.zip

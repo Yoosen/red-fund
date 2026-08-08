@@ -108,7 +108,7 @@ def main():
     image.save(BUILD / "icon.ico", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
 
     with tempfile.TemporaryDirectory() as tmp:
-        iconset = Path(tmp) / "fund-pulse.iconset"
+        iconset = Path(tmp) / "red-fund.iconset"
         iconset.mkdir()
         icon_sizes = {
             "icon_16x16.png": 16,

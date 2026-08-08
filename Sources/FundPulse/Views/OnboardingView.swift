@@ -66,7 +66,7 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             PanelHeader(
                 systemImage: "wave.3.right.circle.fill",
-                title: "欢迎使用 Fund Pulse",
+                title: "欢迎使用 Red Fund",
                 subtitle: "首次设置 · 第 \(step + 1) / 3 步",
                 accessoryText: "本地优先",
                 accessoryColor: .green,
@@ -209,7 +209,7 @@ struct OnboardingView: View {
             onboardingAction(
                 icon: "square.and.arrow.down",
                 title: "导入备份",
-                detail: "从 Fund Pulse JSON 备份恢复",
+                detail: "从 Red Fund JSON 备份恢复",
                 tint: .blue,
                 action: onImportPortfolio
             )

@@ -576,13 +576,13 @@ struct PopoverContentView: View {
     private var appUpdateRowDetail: String {
         switch updateStore.status {
         case .available(let info):
-            return "\(info.releaseName.isEmpty ? "fund-pulse" : info.releaseName) · 点击后先下载，下载完成后再安装。"
+            return "\(info.releaseName.isEmpty ? "red-fund" : info.releaseName) · 点击后先下载，下载完成后再安装。"
         case .downloading:
             return "下载完成后会显示“现在更新”。"
         case .downloaded(let info, _):
-            return "v\(info.version) 已准备好。现在更新会退出并重新打开 fund-pulse。"
+            return "v\(info.version) 已准备好。现在更新会退出并重新打开 red-fund。"
         case .installing:
-            return "fund-pulse 将自动退出并重新打开。"
+            return "red-fund 将自动退出并重新打开。"
         case .idle, .checking, .upToDate, .failed:
             return ""
         }

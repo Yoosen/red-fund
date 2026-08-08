@@ -4,11 +4,11 @@ import Foundation
 enum SupportAuthorCopy {
     /// 引导用户支持作者的说明文案。
     static let motivation =
-        "Fund Pulse 免费、开源且无广告。您的支持，是我持续更新、修复问题和适配新版 macOS 的最大动力。感谢您的认可与鼓励。"
+        "Red Fund 免费、开源且无广告。您的支持，是我持续更新、修复问题和适配新版 macOS 的最大动力。感谢您的认可与鼓励。"
 
     /// 支付边界说明：自愿、不解锁功能、支付由第三方处理。
     static let paymentBoundary =
-        "支持完全自愿，不会解锁额外功能。支付由微信或支付宝处理，Fund Pulse 不读取、上传或保存支付信息。"
+        "支持完全自愿，不会解锁额外功能。支付由微信或支付宝处理，Red Fund 不读取、上传或保存支付信息。"
 }
 
 /// 支持作者的支付方式（微信 / 支付宝）。

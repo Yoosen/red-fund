@@ -17,7 +17,7 @@ const DAY = 24 * 60 * 60 * 1_000;
 const NOW = new Date("2026-07-21T12:00:00.000Z");
 
 async function withTempDirectory(run) {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "fund-pulse-growth-card-test-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "red-fund-growth-card-test-"));
   try {
     return await run(directory);
   } finally {
@@ -31,7 +31,7 @@ function star(starredAt) {
 
 function cardData(overrides = {}) {
   return {
-    repository: "iamzjt-front-end/fund-pulse",
+    repository: "yoosen/red-fund",
     description: "轻量、原生、隐私优先的 macOS 基金收益助手",
     stars: 8,
     stars7d: 5,
@@ -160,7 +160,7 @@ test("API failures preserve both previously valid cards", async () => {
 
     await assert.rejects(
       () => generateGrowthCards({
-        repository: "iamzjt-front-end/fund-pulse",
+        repository: "yoosen/red-fund",
         outputDirectory: directory,
         token: "super-secret-token",
         fetchImpl,
@@ -178,7 +178,7 @@ test("API failures preserve both previously valid cards", async () => {
 test("generates both themes with rolling star counts, forks, and unique human contributors", async () => {
   await withTempDirectory(async (directory) => {
     const fetchImpl = async (url) => {
-      if (url.endsWith("/repos/iamzjt-front-end/fund-pulse")) {
+      if (url.endsWith("/repos/yoosen/red-fund")) {
         return new Response(JSON.stringify({
           stargazers_count: 3,
           forks_count: 4,
@@ -204,7 +204,7 @@ test("generates both themes with rolling star counts, forks, and unique human co
     };
 
     const result = await generateGrowthCards({
-      repository: "iamzjt-front-end/fund-pulse",
+      repository: "yoosen/red-fund",
       outputDirectory: directory,
       token: "super-secret-token",
       fetchImpl,
@@ -250,7 +250,7 @@ test("rejects a star-list total that disagrees with repository metadata without 
 
     await assert.rejects(
       () => generateGrowthCards({
-        repository: "iamzjt-front-end/fund-pulse",
+        repository: "yoosen/red-fund",
         outputDirectory: directory,
         token: "token",
         fetchImpl,

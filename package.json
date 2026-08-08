@@ -1,6 +1,6 @@
 {
-  "name": "fund-pulse",
-  "productName": "fund-pulse",
+  "name": "red-fund",
+  "productName": "red-fund",
   "version": "1.1.4",
   "private": true,
   "description": "基金持仓收益 macOS 状态栏工具，Swift 原生实现，数据源来自东方财富/天天基金等",
@@ -14,7 +14,7 @@
     "test:release:unit": "node scripts/run-release-tests.mjs --unit",
     "test:release": "node scripts/run-release-tests.mjs",
     "test:readme": "node --test scripts/tests/project-growth-card.test.mjs",
-    "readme:growth": "node scripts/generate-project-growth-card.mjs --repo iamzjt-front-end/fund-pulse --output-dir screenshots",
+    "readme:growth": "node scripts/generate-project-growth-card.mjs --repo yoosen/red-fund --output-dir screenshots",
     "release": "./scripts/release.sh --bump patch",
     "release:dry": "./scripts/release.sh --dry-run --bump patch --yes",
     "release-all": "./scripts/release.sh --bump patch",
@@ -28,15 +28,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/iamzjt-front-end/fund-pulse.git"
+    "url": "git+https://github.com/yoosen/red-fund.git"
   },
   "author": {
-    "name": "iamzjt-front-end",
-    "url": "https://github.com/iamzjt-front-end"
+    "name": "yoosen",
+    "url": "https://github.com/yoosen"
   },
   "license": "GPL-3.0",
   "bugs": {
-    "url": "https://github.com/iamzjt-front-end/fund-pulse/issues"
+    "url": "https://github.com/yoosen/red-fund/issues"
   },
   "keywords": [
     "swift",
@@ -47,7 +47,7 @@
     "chinese",
     "funds"
   ],
-  "homepage": "https://github.com/iamzjt-front-end/fund-pulse",
+  "homepage": "https://github.com/yoosen/red-fund",
   "devDependencies": {},
   "dependencies": {},
   "devEngines": {

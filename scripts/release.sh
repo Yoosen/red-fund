@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_REPO="iamzjt-front-end/fund-pulse"
+DEFAULT_REPO="yoosen/red-fund"
 PACKAGE_SCRIPT="package"
 RELEASE_DIR="release/swift"
-APP_BUNDLE="dist/fund-pulse.app"
+APP_BUNDLE="dist/Red Fund.app"
 FRAGMENTS_DIR=".release-notes"
 CHANGELOG_PATH="CHANGELOG.md"
 
@@ -75,7 +75,7 @@ Options:
   --bump patch|minor|major
                          基于 package.json 自动升级版本
   --tag TAG              指定发布 tag；默认 v<package.json version>
-  --repo OWNER/REPO      GitHub 仓库；默认 iamzjt-front-end/fund-pulse
+  --repo OWNER/REPO      GitHub 仓库；默认 yoosen/red-fund
   --notes-file FILE      覆盖 GitHub Release 正文；片段仍写入 Changelog
   --allow-empty-notes    显式允许没有变更片段的纯重新打包发布
   --yes                  跳过交互确认
@@ -149,11 +149,11 @@ done
 
 task_start() {
   TASK_STARTED=1
-  printf '\n%s%s fund-pulse release start %s\n' "$BG_BLUE" "$BOLD" "$RESET"
+  printf '\n%s%s Red Fund release start %s\n' "$BG_BLUE" "$BOLD" "$RESET"
 }
 
 task_end() {
-  printf '\n%s%s fund-pulse release end %s\n' "$BG_GREEN" "$BOLD" "$RESET"
+  printf '\n%s%s Red Fund release end %s\n' "$BG_GREEN" "$BOLD" "$RESET"
 }
 
 progress_bar() {
@@ -198,7 +198,7 @@ print_box() {
 
 ensure_log_dir() {
   if [[ -z "$LOG_DIR" ]]; then
-    LOG_DIR="$(mktemp -d -t fund-pulse-release-logs.XXXXXX)"
+    LOG_DIR="$(mktemp -d -t red-fund-release-logs.XXXXXX)"
   fi
 }
 
@@ -677,7 +677,7 @@ verify_remote_release() {
   draft_state="$(gh release view "$target_tag" --repo "$REPO" --json isDraft --jq '.isDraft')"
   [[ "$draft_state" == "$expected_draft" ]] || { echo "远端 Draft 状态不正确：${draft_state}" >&2; exit 1; }
   release_name="$(gh release view "$target_tag" --repo "$REPO" --json name --jq '.name')"
-  [[ "$release_name" == "fund-pulse ${target_tag}" ]] || { echo "远端 Release 标题不正确。" >&2; exit 1; }
+  [[ "$release_name" == "Red Fund ${target_tag}" ]] || { echo "远端 Release 标题不正确。" >&2; exit 1; }
   prerelease_state="$(gh release view "$target_tag" --repo "$REPO" --json isPrerelease --jq '.isPrerelease')"
   [[ "$prerelease_state" == "false" ]] || { echo "远端 Release 不应为 prerelease。" >&2; exit 1; }
   asset_names="$(gh release view "$target_tag" --repo "$REPO" --json assets --jq '.assets[].name' | sort)"
@@ -696,7 +696,7 @@ for command_name in git gh node npm swift shasum codesign security plutil; do
 done
 
 if [[ ! -d .git || ! -f package.json || ! -f Package.swift || ! -f scripts/release-notes.mjs ]]; then
-  echo "请在 fund-pulse 仓库根目录运行 scripts/release.sh。" >&2
+  echo "请在 red-fund 仓库根目录运行 scripts/release.sh。" >&2
   exit 1
 fi
 
@@ -777,8 +777,8 @@ if [[ -z "$last_release_tag" || "$last_release_tag" == "null" ]] || ! git rev-pa
 fi
 
 arch="$(uname -m)"
-zip_path="${RELEASE_DIR}/fund-pulse-${target_version}-${arch}-swift.zip"
-dmg_path="${RELEASE_DIR}/fund-pulse-${target_version}-${arch}-swift.dmg"
+zip_path="${RELEASE_DIR}/red-fund-${target_version}-${arch}-swift.zip"
+dmg_path="${RELEASE_DIR}/red-fund-${target_version}-${arch}-swift.dmg"
 feed_path="${RELEASE_DIR}/latest-mac.yml"
 zip_name="$(basename "$zip_path")"
 dmg_name="$(basename "$dmg_path")"
@@ -794,13 +794,13 @@ Previous:  ${last_release_tag:-<none>}
 ZIP:       $zip_name
 DMG:       $dmg_name"
 
-notes_tmp="$(mktemp -t fund-pulse-release-notes.XXXXXX)"
-entry_tmp="$(mktemp -t fund-pulse-changelog-entry.XXXXXX)"
-manifest_tmp="$(mktemp -t fund-pulse-release-manifest.XXXXXX)"
-initial_manifest_tmp="$(mktemp -t fund-pulse-initial-manifest.XXXXXX)"
-manifest_names_tmp="$(mktemp -t fund-pulse-manifest-names.XXXXXX)"
-staged_names_tmp="$(mktemp -t fund-pulse-staged-names.XXXXXX)"
-remote_body_tmp="$(mktemp -t fund-pulse-remote-body.XXXXXX)"
+notes_tmp="$(mktemp -t red-fund-release-notes.XXXXXX)"
+entry_tmp="$(mktemp -t red-fund-changelog-entry.XXXXXX)"
+manifest_tmp="$(mktemp -t red-fund-release-manifest.XXXXXX)"
+initial_manifest_tmp="$(mktemp -t red-fund-initial-manifest.XXXXXX)"
+manifest_names_tmp="$(mktemp -t red-fund-manifest-names.XXXXXX)"
+staged_names_tmp="$(mktemp -t red-fund-staged-names.XXXXXX)"
+remote_body_tmp="$(mktemp -t red-fund-remote-body.XXXXXX)"
 TEMP_PATHS+=("$notes_tmp" "$entry_tmp" "$manifest_tmp" "$initial_manifest_tmp" "$manifest_names_tmp" "$staged_names_tmp" "$remote_body_tmp")
 
 set_step 3
@@ -821,9 +821,9 @@ if [[ "$DRY_RUN" == 1 ]]; then
   run_dry git add -- package.json CHANGELOG.md ".release-notes/<manifest-files>"
   run_dry git commit -m "chore: release ${target_tag}"
   set_step 7
-  run_dry git tag -a "$target_tag" -m "fund-pulse ${target_tag}"
+  run_dry git tag -a "$target_tag" -m "Red Fund ${target_tag}"
   run_dry git push --atomic origin "$current_branch" "refs/tags/${target_tag}"
-  run_dry gh release create "$target_tag" "$zip_path" "$dmg_path" "$feed_path" --repo "$REPO" --target "<release-commit>" --title "fund-pulse ${target_tag}" --notes-file "$notes_tmp" --draft
+  run_dry gh release create "$target_tag" "$zip_path" "$dmg_path" "$feed_path" --repo "$REPO" --target "<release-commit>" --title "Red Fund ${target_tag}" --notes-file "$notes_tmp" --draft
   set_step 8
   step_note "DRY-RUN: 校验正文、tag、三个资产和 latest-mac.yml 后正式发布"
   run_dry gh release edit "$target_tag" --repo "$REPO" --draft=false --latest
@@ -841,7 +841,7 @@ run_progress "检查 diff 空白" "diff 检查通过" git diff --check
 assert_clean_worktree
 
 set_step 5
-PACKAGE_BACKUP="$(mktemp -t fund-pulse-package-backup.XXXXXX)"
+PACKAGE_BACKUP="$(mktemp -t red-fund-package-backup.XXXXXX)"
 TEMP_PATHS+=("$PACKAGE_BACKUP")
 cp package.json "$PACKAGE_BACKUP"
 write_package_version "$target_version"
@@ -878,7 +878,7 @@ manifest_file_names "$manifest_tmp" >"$manifest_names_tmp"
 print_box "Final release notes" "$(cat "$notes_tmp")"
 
 set_step 6
-METADATA_BACKUP_DIR="$(mktemp -d -t fund-pulse-release-metadata-backup.XXXXXX)"
+METADATA_BACKUP_DIR="$(mktemp -d -t red-fund-release-metadata-backup.XXXXXX)"
 TEMP_PATHS+=("$METADATA_BACKUP_DIR")
 cp "$CHANGELOG_PATH" "$METADATA_BACKUP_DIR/CHANGELOG.md"
 mkdir -p "$METADATA_BACKUP_DIR/fragments"
@@ -899,18 +899,18 @@ git diff --cached --check
 run_progress "提交发布元数据" "发布提交已创建" git commit -m "chore: release ${target_tag}"
 RELEASE_COMMITTED=1
 release_commit="$(git rev-parse HEAD)"
-run_progress "创建发布 tag" "发布 tag 已创建" git tag -a "$target_tag" -m "fund-pulse ${target_tag}"
+run_progress "创建发布 tag" "发布 tag 已创建" git tag -a "$target_tag" -m "Red Fund ${target_tag}"
 
 set_step 7
 run_progress "原子推送 main 和 tag" "main 和 tag 已推送" git push --atomic origin "$current_branch" "refs/tags/${target_tag}"
 REMOTE_REFS_PUSHED=1
-run_progress "创建 Draft Release" "Draft Release 已创建" gh release create "$target_tag" --repo "$REPO" --target "$release_commit" --title "fund-pulse ${target_tag}" --notes-file "$notes_tmp" --draft
+run_progress "创建 Draft Release" "Draft Release 已创建" gh release create "$target_tag" --repo "$REPO" --target "$release_commit" --title "Red Fund ${target_tag}" --notes-file "$notes_tmp" --draft
 DRAFT_CREATED=1
 run_progress "上传 Release 资产" "Release 资产已上传" gh release upload "$target_tag" "$zip_path" "$dmg_path" "$feed_path" --repo "$REPO" --clobber
 
 set_step 8
 verify_remote_release "true"
-verify_dir="$(mktemp -d -t fund-pulse-release-verify.XXXXXX)"
+verify_dir="$(mktemp -d -t red-fund-release-verify.XXXXXX)"
 TEMP_PATHS+=("$verify_dir")
 gh release download "$target_tag" --repo "$REPO" --pattern "$feed_name" --dir "$verify_dir" --clobber >/dev/null
 if ! grep -q "version: ${target_version}" "${verify_dir}/${feed_name}"; then

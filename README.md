@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="./build/icon.png" width="112" alt="Fund Pulse 应用图标">
+  <img src="./build/icon.png" width="112" alt="Red Fund 应用图标">
 </p>
 
-<h1 align="center">Fund Pulse</h1>
+<h1 align="center">Red Fund</h1>
 
 <p align="center">
   <strong>把基金持仓、盘中估值与长期收益，安静地放进 macOS 菜单栏。</strong><br>
@@ -29,9 +29,9 @@
 </p>
 
 > [!IMPORTANT]
-> Fund Pulse 是个人基金记录与信息展示工具，不连接券商执行交易，也不构成投资建议。盘中估值来自第三方公开数据，可能延迟、缺失或与最终官方净值不同。
+> Red Fund 是个人基金记录与信息展示工具，不连接券商执行交易，也不构成投资建议。盘中估值来自第三方公开数据，可能延迟、缺失或与最终官方净值不同。
 
-Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、交易记录、盘中估值和组合收益。应用没有自有账号与云端后台，核心数据默认只保存在当前 Mac。
+Red Fund 是一款原生 macOS 菜单栏应用，用于管理基金持仓、交易记录、盘中估值和组合收益。应用没有自有账号与云端后台，核心数据默认只保存在当前 Mac。
 
 ## 核心功能
 
@@ -65,7 +65,7 @@ Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、�
 
 - 本项目基于 [iamzjt-front-end/fund-pulse](https://github.com/iamzjt-front-end/fund-pulse) 二次开发，已对原有功能做了较多改动与扩展。
 - 本仓库版本与原作者版本相互独立，功能、构建与发布均由本仓库维护，与原作者无关。
-- Fund Pulse 是个人基金记录与信息展示工具，不连接券商执行交易，也不构成投资建议。盘中估值来自第三方公开数据，可能延迟、缺失或与最终官方净值不同。
+- Red Fund 是个人基金记录与信息展示工具，不连接券商执行交易，也不构成投资建议。盘中估值来自第三方公开数据，可能延迟、缺失或与最终官方净值不同。
 - 本软件仅供个人学习与研究使用，请遵守所在地区相关法律法规与平台服务条款。
 
 ## 安装
@@ -74,8 +74,8 @@ Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、�
 
 1. 打开 [Latest Release](https://github.com/Yoosen/red-fund/releases/latest)。
 2. 下载名称以 `arm64-swift.dmg` 结尾的安装包。
-3. 打开 DMG，将 `fund-pulse.app` 拖入“应用程序”。
-4. 启动后在菜单栏找到 Fund Pulse 图标；应用不会在 Dock 常驻。
+3. 打开 DMG，将 `red-fund.app` 拖入“应用程序”。
+4. 启动后在菜单栏找到 Red Fund 图标；应用不会在 Dock 常驻。
 
 当前未提供 Intel、Homebrew Cask 或 Mac App Store 版本。请只从本仓库 Release 下载。
 
@@ -83,12 +83,12 @@ Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、�
 
 本仓库发布的安装包未使用付费的 Apple Developer ID 签名，也未经过 Apple 公证（Notarization）。macOS 的 Gatekeeper 会因此拦截应用，直接双击打开会提示“无法验证开发者”或“已损坏”。请按以下步骤运行：
 
-1. 从本仓库 Release 下载并打开 DMG，将 fund-pulse.app 拖入“应用程序”文件夹。
-2. 首次打开时若被系统拦截，请先在 Finder 中选中 fund-pulse.app，按住 Control 键单击（或右键），选择「打开」，在弹出的对话框中再次点击「打开」。
+1. 从本仓库 Release 下载并打开 DMG，将 red-fund.app 拖入“应用程序”文件夹。
+2. 首次打开时若被系统拦截，请先在 Finder 中选中 red-fund.app，按住 Control 键单击（或右键），选择「打开」，在弹出的对话框中再次点击「打开」。
 3. 若上述方式仍被拦截，可到系统设置 > 隐私与安全性，在“安全性”区域会出现被拦截的提示，点击「仍要打开」即可。
 4. 如提示应用“已损坏，无法打开”，可在终端执行以下命令移除隔离属性后再打开：
 
-   xattr -cr /Applications/fund-pulse.app
+   xattr -cr /Applications/red-fund.app
 
    说明：xattr -cr 只是清除 macOS 给从网络下载的文件加上的隔离标记，不会修改应用内容。仅在你确认安装包来自本仓库 Release 时执行。
 
@@ -112,19 +112,19 @@ Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、�
 主要数据保存在：
 
 ```text
-~/Library/Application Support/fund-pulse/
+~/Library/Application Support/red-fund/
 ├── portfolio.json
 ├── settings.json
 └── portfolio-performance.json
 ```
 
-- Fund Pulse 不提供自有账号、云同步或数据后台，也不包含广告与分析 SDK。
+- Red Fund 不提供自有账号、云同步或数据后台，也不包含广告与分析 SDK。
 - 基金行情和市场概览来自第三方公开接口；GitHub Releases 用于检查和下载更新。
-- 京东金融同步只在用户主动操作时运行，相关 Cookie 不会发送给 Fund Pulse 自有服务器或其他行情服务商。
-- 持仓可在应用内导入、导出；换机或清理前建议备份整个 `fund-pulse` 目录。
+- 京东金融同步只在用户主动操作时运行，相关 Cookie 不会发送给 Red Fund 自有服务器或其他行情服务商。
+- 持仓可在应用内导入、导出；换机或清理前建议备份整个 `red-fund` 目录。
 - 如需彻底删除数据，请先退出应用，再删除上述目录。仅删除 `.app` 不一定会移除本地数据。
 
-完整的数据来源、网络边界和删除说明见[《Fund Pulse 隐私政策与免责声明》](./PRIVACY.md)。
+完整的数据来源、网络边界和删除说明见[《Red Fund 隐私政策与免责声明》](./PRIVACY.md)。
 
 ## 常见问题
 
@@ -145,7 +145,7 @@ Fund Pulse 是一款原生 macOS 菜单栏应用，用于管理基金持仓、�
 <details>
 <summary><strong>换一台 Mac 后数据会自动同步吗？</strong></summary>
 
-不会。Fund Pulse 没有自有云同步。请先导出持仓，并按需备份 `~/Library/Application Support/fund-pulse` 后再迁移到新设备。
+不会。Red Fund 没有自有云同步。请先导出持仓，并按需备份 `~/Library/Application Support/red-fund` 后再迁移到新设备。
 
 </details>
 
@@ -178,25 +178,16 @@ npm run dev
 
 ## 支持项目
 
-Fund Pulse 免费、开源且无广告。如果它对你有帮助，欢迎点亮 Star、反馈问题、改进文档或参与贡献。自愿支持作者的入口位于应用“设置 > 支持”，不会解锁额外功能或提供赞助者权益。
+Red Fund 免费、开源且无广告。如果它对你有帮助，欢迎点亮 Star、反馈问题、改进文档或参与贡献。自愿支持作者的入口位于应用“设置 > 支持”，不会解锁额外功能或提供赞助者权益。
 
-## 项目成长
-
-<a href="https://github.com/Yoosen/red-fund/stargazers">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./screenshots/star-growth-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./screenshots/star-growth-light.svg">
-  <img src="./screenshots/star-growth-light.svg" width="100%" alt="Fund Pulse Stars、Forks、贡献者与累计 Star 增长趋势">
-</picture>
-</a>
 
 ## 许可证与免责声明
 
 本项目依据 [GNU General Public License v3.0](./LICENSE) 开源。
 
-Fund Pulse 仅用于个人记录和信息参考，不构成投资建议、要约、招揽或交易依据，也不承诺行情、净值、估值和计算结果完整准确。投资决策及损失由使用者自行承担；完整条款见[《Fund Pulse 隐私政策与免责声明》](./PRIVACY.md)。
+Red Fund 仅用于个人记录和信息参考，不构成投资建议、要约、招揽或交易依据，也不承诺行情、净值、估值和计算结果完整准确。投资决策及损失由使用者自行承担；完整条款见[《Red Fund 隐私政策与免责声明》](./PRIVACY.md)。
 
 <p align="center">
-  如果 Fund Pulse 对你有帮助，欢迎点亮一个 ⭐️。<br>
+  如果 Red Fund 对你有帮助，欢迎点亮一个 ⭐️。<br>
   <sub>Made for a calmer macOS menu bar.</sub>
 </p>

@@ -10,7 +10,7 @@ final class SupportAuthorResourcesTests: XCTestCase {
     func testSupportCopyIsWarmAndKeepsTheVoluntaryBoundary() {
         XCTAssertEqual(
             SupportAuthorCopy.motivation,
-            "Fund Pulse 免费、开源且无广告。您的支持，是我持续更新、修复问题和适配新版 macOS 的最大动力。感谢您的认可与鼓励。"
+            "Red Fund 免费、开源且无广告。您的支持，是我持续更新、修复问题和适配新版 macOS 的最大动力。感谢您的认可与鼓励。"
         )
         XCTAssertTrue(SupportAuthorCopy.paymentBoundary.contains("支持完全自愿"))
         XCTAssertTrue(SupportAuthorCopy.paymentBoundary.contains("不会解锁额外功能"))

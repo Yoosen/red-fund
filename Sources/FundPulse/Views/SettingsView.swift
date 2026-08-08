@@ -378,9 +378,9 @@ struct SettingsView: View {
         }
     }
 
-    /// 底部操作栏：退出 Fund Pulse（NSApp.terminate）。
+    /// 底部操作栏：退出 Red Fund（NSApp.terminate）。
     private var settingsFooter: some View {
-        plainTextButton("退出 Fund Pulse", systemImage: "power", role: .destructive) {
+        plainTextButton("退出 Red Fund", systemImage: "power", role: .destructive) {
             NSApp.terminate(nil)
         }
     }
@@ -1450,7 +1450,7 @@ struct SettingsView: View {
                 return ("请求通知权限失败：\(error.localizedDescription)", true)
             }
         case .denied:
-            return ("系统通知权限已关闭，请在 macOS 系统设置中允许 fund-pulse 通知。", true)
+            return ("系统通知权限已关闭，请在 macOS 系统设置中允许 red-fund 通知。", true)
         case .authorized, .provisional, .ephemeral:
             break
         @unknown default:
@@ -1459,16 +1459,16 @@ struct SettingsView: View {
 
         let refreshedSettings = await center.notificationSettings()
         if refreshedSettings.alertSetting == .disabled {
-            return ("通知权限已允许，但横幅/提醒显示被关闭，请检查 fund-pulse 的通知样式。", true)
+            return ("通知权限已允许，但横幅/提醒显示被关闭，请检查 red-fund 的通知样式。", true)
         }
 
         let content = UNMutableNotificationContent()
-        content.title = "fund-pulse 测试提醒"
+        content.title = "red-fund 测试提醒"
         content.body = "如果你看到这条通知，说明系统通知权限正常。"
         content.sound = .default
 
         let request = UNNotificationRequest(
-            identifier: "fund-pulse.test-reminder.\(Int(Date().timeIntervalSince1970))",
+            identifier: "red-fund.test-reminder.\(Int(Date().timeIntervalSince1970))",
             content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         )

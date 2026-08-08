@@ -3848,10 +3848,43 @@ enum PortfolioStoreError: LocalizedError, Equatable {
 }
 
 enum AppDataPaths {
+    /// 当前数据目录（~/Library/Application Support/red-fund）。
     static var sharedDataDirectory: URL {
+        migrateLegacyDataDirectoryIfNeeded()
+        return FileManager.default
+            .homeDirectoryForCurrentUser
+            .appending(path: "Library/Application Support/red-fund", directoryHint: .isDirectory)
+    }
+
+    /// 旧数据目录（迁移前的 fund-pulse），仅用于一次性迁移。
+    private static var legacyDataDirectory: URL {
         FileManager.default
             .homeDirectoryForCurrentUser
             .appending(path: "Library/Application Support/fund-pulse", directoryHint: .isDirectory)
+    }
+
+    /// 首次启动时把旧 fund-pulse 数据目录整体迁移到 red-fund，避免用户数据丢失。
+    /// 已迁移（目标目录已存在）或源目录不存在时直接跳过。
+    private static func migrateLegacyDataDirectoryIfNeeded() {
+        let fileManager = FileManager.default
+        let source = legacyDataDirectory
+        let destination = sharedDataDirectoryResolved
+        guard fileManager.fileExists(atPath: source.path),
+              !fileManager.fileExists(atPath: destination.path) else { return }
+        do {
+            try fileManager.createDirectory(at: destination.deletingLastPathComponent(),
+                                            withIntermediateDirectories: true)
+            try fileManager.moveItem(at: source, to: destination)
+        } catch {
+            // 迁移失败不阻断启动；新目录会被各 Store 自行创建为空数据。
+            NSLog("AppDataPaths: 旧数据目录迁移失败（fund-pulse -> red-fund）: \(error.localizedDescription)")
+        }
+    }
+
+    private static var sharedDataDirectoryResolved: URL {
+        FileManager.default
+            .homeDirectoryForCurrentUser
+            .appending(path: "Library/Application Support/red-fund", directoryHint: .isDirectory)
     }
 
     static func hasLegacyStore(in directory: URL) -> Bool {

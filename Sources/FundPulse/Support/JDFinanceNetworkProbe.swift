@@ -11,7 +11,7 @@ enum JDFinanceDebugArtifacts {
     static func removePersistedFiles(
         in directory: URL = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appending(path: "fund-pulse", directoryHint: .isDirectory)
+            .appending(path: "red-fund", directoryHint: .isDirectory)
     ) {
         for fileName in fileNames {
             try? FileManager.default.removeItem(at: directory.appending(path: fileName))
@@ -958,11 +958,11 @@ final class JDFinanceNetworkProbe: @unchecked Sendable {
         try? FileManager.default.removeItem(at: url)
     }
 
-    /// 返回调试日志文件在 Application Support 中的完整路径（fund-pulse/jd-network-probe.log）。
+    /// 返回调试日志文件在 Application Support 中的完整路径（red-fund/jd-network-probe.log）。
     private static func debugLogURL() -> URL {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appending(path: "fund-pulse", directoryHint: .isDirectory)
+            .appending(path: "red-fund", directoryHint: .isDirectory)
             .appending(path: "jd-network-probe.log")
     }
 

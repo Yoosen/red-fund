@@ -13145,22 +13145,22 @@ final class FundPulseCoreTests: XCTestCase {
 
     func testOperationReminderCleanupAlwaysIncludesLegacyRepeatingIdentifier() {
         XCTAssertEqual(
-            StatusBarController.operationReminderNotificationIdentifiersToClear(
+            Set(StatusBarController.operationReminderNotificationIdentifiersToClear(
                 from: [
-                    "fund-pulse.operation-reminder.2026-07-01",
+                    "red-fund.operation-reminder.2026-07-01",
                     "other.notification"
                 ]
-            ),
-            [
-                "fund-pulse.operation-reminder",
-                "fund-pulse.operation-reminder.2026-07-01"
-            ]
+            )),
+            Set([
+                "red-fund.operation-reminder",
+                "red-fund.operation-reminder.2026-07-01"
+            ])
         )
     }
 
     func testOperationReminderCleanupClearsLegacyContentWithUnknownIdentifier() {
         XCTAssertEqual(
-            StatusBarController.operationReminderNotificationIdentifiersToClear(
+            Set(StatusBarController.operationReminderNotificationIdentifiersToClear(
                 from: [
                     OperationReminderNotificationCandidate(
                         identifier: "legacy.daily-reminder",
@@ -13168,8 +13168,8 @@ final class FundPulseCoreTests: XCTestCase {
                         body: "现在可以检查基金估值，按计划处理加仓、减仓或继续持仓。"
                     ),
                     OperationReminderNotificationCandidate(
-                        identifier: "fund-pulse.test-reminder.1",
-                        title: "fund-pulse 测试提醒",
+                        identifier: "red-fund.test-reminder.1",
+                        title: "red-fund 测试提醒",
                         body: "如果你看到这条通知，说明系统通知权限正常。"
                     ),
                     OperationReminderNotificationCandidate(
@@ -13178,11 +13178,11 @@ final class FundPulseCoreTests: XCTestCase {
                         body: "别的内容"
                     )
                 ]
-            ),
-            [
-                "fund-pulse.operation-reminder",
+            )),
+            Set([
+                "red-fund.operation-reminder",
                 "legacy.daily-reminder"
-            ]
+            ])
         )
     }
 
@@ -13190,7 +13190,7 @@ final class FundPulseCoreTests: XCTestCase {
     func testOperationReminderSchedulerWaitsUntilDuplicateRequestsAreRemovedBeforeAdding() async throws {
         let reminderDate = try chinaDate("2026-07-14 14:30")
         let request = OperationReminderNotificationRequest(
-            identifier: "fund-pulse.operation-reminder.2026-07-14",
+            identifier: "red-fund.operation-reminder.2026-07-14",
             title: OperationReminderNotificationContent.title,
             body: OperationReminderNotificationContent.body,
             fireDate: reminderDate
@@ -13222,13 +13222,13 @@ final class FundPulseCoreTests: XCTestCase {
     @MainActor
     func testOperationReminderSchedulerKeepsOnlyLatestConsecutiveConfiguration() async throws {
         let firstRequest = OperationReminderNotificationRequest(
-            identifier: "fund-pulse.operation-reminder.2026-07-14",
+            identifier: "red-fund.operation-reminder.2026-07-14",
             title: OperationReminderNotificationContent.title,
             body: OperationReminderNotificationContent.body,
             fireDate: try chinaDate("2026-07-14 14:30")
         )
         let latestRequest = OperationReminderNotificationRequest(
-            identifier: "fund-pulse.operation-reminder.2026-07-15",
+            identifier: "red-fund.operation-reminder.2026-07-15",
             title: OperationReminderNotificationContent.title,
             body: OperationReminderNotificationContent.body,
             fireDate: try chinaDate("2026-07-15 14:30")
@@ -13247,7 +13247,7 @@ final class FundPulseCoreTests: XCTestCase {
     func testOperationReminderPresentationGateSuppressesConsecutiveDuplicateBanners() async throws {
         let gate = OperationReminderNotificationPresentationGate(duplicateWindow: 60)
         let candidate = OperationReminderNotificationCandidate(
-            identifier: "fund-pulse.operation-reminder.2026-07-14",
+            identifier: "red-fund.operation-reminder.2026-07-14",
             title: OperationReminderNotificationContent.title,
             body: OperationReminderNotificationContent.body
         )
@@ -13270,8 +13270,8 @@ final class FundPulseCoreTests: XCTestCase {
     func testOperationReminderPresentationGateDoesNotSuppressOtherNotifications() async throws {
         let gate = OperationReminderNotificationPresentationGate(duplicateWindow: 60)
         let testReminder = OperationReminderNotificationCandidate(
-            identifier: "fund-pulse.test-reminder.1",
-            title: "fund-pulse 测试提醒",
+            identifier: "red-fund.test-reminder.1",
+            title: "red-fund 测试提醒",
             body: "如果你看到这条通知，说明系统通知权限正常。"
         )
         let deliveryDate = try chinaDate("2026-07-14 14:30")
@@ -15455,11 +15455,11 @@ final class FundPulseCoreTests: XCTestCase {
     private func appUpdateInfo(version: String) throws -> AppUpdateInfo {
         AppUpdateInfo(
             version: version,
-            releaseName: "fund-pulse \(version)",
+            releaseName: "Red Fund \(version)",
             releaseNotes: "",
             publishedAt: nil,
             htmlURL: try XCTUnwrap(URL(string: "https://example.com/releases/tag/v\(version)")),
-            downloadURL: try XCTUnwrap(URL(string: "https://example.com/fund-pulse-\(version).zip"))
+            downloadURL: try XCTUnwrap(URL(string: "https://example.com/red-fund-\(version).zip"))
         )
     }
 
@@ -15477,36 +15477,36 @@ final class FundPulseCoreTests: XCTestCase {
     }
 
     private static func githubLatestReleaseAPIEndpoint() -> String {
-        "https://api.github.com/repos/iamzjt-front-end/fund-pulse/releases/latest"
+        "https://api.github.com/repos/yoosen/red-fund/releases/latest"
     }
 
     private static func githubLatestReleaseWebEndpoint() -> String {
-        "https://github.com/iamzjt-front-end/fund-pulse/releases/latest"
+        "https://github.com/yoosen/red-fund/releases/latest"
     }
 
     private static func githubReleaseTagURL(version: String) -> String {
-        "https://github.com/iamzjt-front-end/fund-pulse/releases/tag/v\(version)"
+        "https://github.com/yoosen/red-fund/releases/tag/v\(version)"
     }
 
     private static func githubMacReleaseFeedEndpoint(version: String) -> String {
-        "https://github.com/iamzjt-front-end/fund-pulse/releases/download/v\(version)/latest-mac.yml"
+        "https://github.com/yoosen/red-fund/releases/download/v\(version)/latest-mac.yml"
     }
 
     private static func githubZipDownloadURL(version: String) -> String {
-        "https://github.com/iamzjt-front-end/fund-pulse/releases/download/v\(version)/fund-pulse-\(version)-arm64.zip"
+        "https://github.com/yoosen/red-fund/releases/download/v\(version)/red-fund-\(version)-arm64.zip"
     }
 
     private static func githubReleaseResponse(version: String) -> String {
         """
         {
           "tag_name": "v\(version)",
-          "name": "fund-pulse v\(version)",
+          "name": "Red Fund v\(version)",
           "body": "",
           "html_url": "\(githubReleaseTagURL(version: version))",
           "published_at": "2026-07-03T08:00:00Z",
           "assets": [
             {
-              "name": "fund-pulse-\(version)-arm64.zip",
+              "name": "red-fund-\(version)-arm64.zip",
               "browser_download_url": "\(githubZipDownloadURL(version: version))"
             }
           ]
@@ -15518,7 +15518,7 @@ final class FundPulseCoreTests: XCTestCase {
         """
         version: \(version)
         files:
-          - url: fund-pulse-\(version)-arm64.zip
+          - url: red-fund-\(version)-arm64.zip
         releaseDate: '2026-07-03T08:00:00.000Z'
         """
     }

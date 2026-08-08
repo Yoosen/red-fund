@@ -6,11 +6,11 @@ final class LegalContentTests: XCTestCase {
     func testPublicLinksUseRepositoryPrivacyAndIssuePages() {
         XCTAssertEqual(
             AppExternalLinks.privacyPolicyURL.absoluteString,
-            "https://github.com/iamzjt-front-end/fund-pulse/blob/main/PRIVACY.md"
+            "https://github.com/yoosen/red-fund/blob/main/PRIVACY.md"
         )
         XCTAssertEqual(
             AppExternalLinks.issueChooserURL.absoluteString,
-            "https://github.com/iamzjt-front-end/fund-pulse/issues/new/choose"
+            "https://github.com/yoosen/red-fund/issues/new/choose"
         )
     }
 

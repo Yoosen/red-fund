@@ -5,7 +5,7 @@ import OSLog
 
 /// 更新模块的日志记录器。
 private let appUpdateStoreLogger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "com.iamzjt.frontend.fund-pulse.swift",
+    subsystem: Bundle.main.bundleIdentifier ?? "com.yoosen.red-fund.swift",
     category: "AppUpdate"
 )
 

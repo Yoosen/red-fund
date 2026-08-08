@@ -53,9 +53,9 @@ struct AppUpdateService: Sendable {
     /// 网络会话。
     private let session: URLSession
     /// 最新发布页（用于重定向解析最新 tag）。
-    private let latestReleaseURL = URL(string: "https://github.com/iamzjt-front-end/fund-pulse/releases/latest")!
+    private let latestReleaseURL = URL(string: "https://github.com/yoosen/red-fund/releases/latest")!
     /// 发布列表基础地址。
-    private let releasesBaseURL = URL(string: "https://github.com/iamzjt-front-end/fund-pulse/releases")!
+    private let releasesBaseURL = URL(string: "https://github.com/yoosen/red-fund/releases")!
     /// 交互式检查超时（秒）。
     private let interactiveAPIRequestTimeout: TimeInterval
     /// 发布订阅信息（latest-mac.yml）请求超时。
@@ -124,7 +124,7 @@ struct AppUpdateService: Sendable {
         }
 
         var request = URLRequest(url: downloadURL)
-        request.setValue("fund-pulse-swift", forHTTPHeaderField: "User-Agent")
+        request.setValue("red-fund-swift", forHTTPHeaderField: "User-Agent")
         let updateDirectory = try prepareUpdateDirectory()
         let destinationURL = updateDirectory.appending(path: fileName)
         let downloadedURL = try await downloadFile(
@@ -186,7 +186,7 @@ struct AppUpdateService: Sendable {
         var request = URLRequest(url: feedURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = releaseFeedRequestTimeout
-        request.setValue("fund-pulse-swift", forHTTPHeaderField: "User-Agent")
+        request.setValue("red-fund-swift", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await session.data(for: request)
         if let httpResponse = response as? HTTPURLResponse,
@@ -207,7 +207,7 @@ struct AppUpdateService: Sendable {
         }
         let info = AppUpdateInfo(
             version: latestVersion,
-            releaseName: "fund-pulse \(latestVersion)",
+            releaseName: "Red Fund \(latestVersion)",
             releaseNotes: "",
             publishedAt: feed.releaseDate,
             htmlURL: htmlURL,
@@ -223,13 +223,13 @@ struct AppUpdateService: Sendable {
 
     /// 主方案：调用 GitHub API 获取最新 release 信息。
     private func checkGitHubAPI(currentVersion: String, timeout: TimeInterval) async throws -> AppUpdateStatus {
-        let apiURL = URL(string: "https://api.github.com/repos/iamzjt-front-end/fund-pulse/releases/latest")!
+        let apiURL = URL(string: "https://api.github.com/repos/yoosen/red-fund/releases/latest")!
         var request = URLRequest(url: latestReleaseURL)
         request.url = apiURL
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = timeout
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("fund-pulse-swift", forHTTPHeaderField: "User-Agent")
+        request.setValue("red-fund-swift", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await session.data(for: request)
         if let httpResponse = response as? HTTPURLResponse,
@@ -311,7 +311,7 @@ struct AppUpdateService: Sendable {
         var request = URLRequest(url: latestReleaseURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = releaseFeedRequestTimeout
-        request.setValue("fund-pulse-swift", forHTTPHeaderField: "User-Agent")
+        request.setValue("red-fund-swift", forHTTPHeaderField: "User-Agent")
         let (_, response) = try await session.data(for: request)
         guard let finalURL = response.url,
               let tag = finalURL.pathComponents.last,
@@ -505,11 +505,11 @@ struct AppUpdateService: Sendable {
         return normalized == expected || VersionComparator.isVersion(normalized, newerThan: expected)
     }
 
-    /// 准备更新目录（Application Support/fund-pulse/Updates）。
+    /// 准备更新目录（Application Support/red-fund/Updates）。
     private func prepareUpdateDirectory(removeExisting: Bool = true) throws -> URL {
         let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let updateDirectory = baseURL
-            .appending(path: "fund-pulse")
+            .appending(path: "red-fund")
             .appending(path: "Updates")
 
         if removeExisting {
@@ -531,7 +531,7 @@ struct AppUpdateService: Sendable {
         LOG_FILE="$4"
 
         {
-          echo "fund-pulse updater started: $(date)"
+          echo "red-fund updater started: $(date)"
 
           i=0
           while /bin/kill -0 "$APP_PID" 2>/dev/null; do
@@ -545,7 +545,7 @@ struct AppUpdateService: Sendable {
 
           TARGET_PARENT="$(/usr/bin/dirname "$TARGET_APP")"
           APP_NAME="$(/usr/bin/basename "$TARGET_APP")"
-          BACKUP_APP="${TARGET_PARENT}/.${APP_NAME}.fund-pulse-update-backup.$$"
+          BACKUP_APP="${TARGET_PARENT}/.${APP_NAME}.red-fund-update-backup.$$"
           /bin/rm -rf "$BACKUP_APP"
 
           if [ -d "$TARGET_APP" ]; then
@@ -557,7 +557,7 @@ struct AppUpdateService: Sendable {
             /usr/bin/open "$TARGET_APP"
             /bin/rm -rf "$BACKUP_APP"
             /bin/rm -rf "$(/usr/bin/dirname "$STAGED_APP")"
-            echo "fund-pulse updater finished: $(date)"
+            echo "red-fund updater finished: $(date)"
           else
             echo "Copy failed; restoring previous app"
             /bin/rm -rf "$TARGET_APP"

@@ -101,12 +101,12 @@ final class SettingsViewTests: XCTestCase {
             source.range(of: "private var operationReminderSettingsSection", range: aboutStart.upperBound..<source.endIndex)
         )
         let aboutSource = source[aboutStart.lowerBound..<aboutEnd.lowerBound]
-        XCTAssertFalse(aboutSource.contains("退出 Fund Pulse"))
+        XCTAssertFalse(aboutSource.contains("退出 Red Fund"))
 
         let footerStart = try XCTUnwrap(source.range(of: "private var settingsFooter"))
         let footerEnd = try XCTUnwrap(source.range(of: "private var aboutSettingsContent"))
         let footerSource = source[footerStart.lowerBound..<footerEnd.lowerBound]
-        XCTAssertTrue(footerSource.contains("退出 Fund Pulse"))
+        XCTAssertTrue(footerSource.contains("退出 Red Fund"))
         XCTAssertFalse(footerSource.contains("PanelSection"))
         XCTAssertFalse(footerSource.contains("\"应用\""))
     }

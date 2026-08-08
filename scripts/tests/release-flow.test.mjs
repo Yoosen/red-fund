@@ -28,7 +28,7 @@ async function git(cwd, ...args) {
 }
 
 async function createReleaseFixture({ fragment = "valid" } = {}) {
-  const root = await mkdtemp(path.join(os.tmpdir(), "fund-pulse-release-flow-test-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "red-fund-release-flow-test-"));
   const repository = path.join(root, "repo");
   const remote = path.join(root, "remote.git");
   const fakeBin = path.join(root, "bin");
@@ -53,7 +53,7 @@ async function createReleaseFixture({ fragment = "valid" } = {}) {
     writeFile(path.join(repository, "CHANGELOG.md"), "# Changelog\n\n## v1.0.41 - 2026-07-08\n\n- 旧版本。\n"),
     writeFile(path.join(repository, ".release-notes/README.md"), "release-note guide\n"),
     writeFile(path.join(repository, "package.json"), `${JSON.stringify({
-      name: "fund-pulse",
+      name: "red-fund",
       version: "1.0.41",
       scripts: {
         package: "true",
@@ -143,10 +143,10 @@ if [[ "\${1:-} \${2:-}" == "run package" ]]; then
   fi
   version="$(node -p "require('./package.json').version")"
   arch="$(uname -m)"
-  mkdir -p dist/fund-pulse.app/Contents release/swift
-  printf '<plist/>\\n' > dist/fund-pulse.app/Contents/Info.plist
-  printf 'zip-%s\\n' "$version" > "release/swift/fund-pulse-\${version}-\${arch}-swift.zip"
-  printf 'dmg-%s\\n' "$version" > "release/swift/fund-pulse-\${version}-\${arch}-swift.dmg"
+  mkdir -p "dist/Red Fund.app/Contents" release/swift
+  printf '<plist/>\\n' > "dist/Red Fund.app/Contents/Info.plist"
+  printf 'zip-%s\\n' "$version" > "release/swift/red-fund-\${version}-\${arch}-swift.zip"
+  printf 'dmg-%s\\n' "$version" > "release/swift/red-fund-\${version}-\${arch}-swift.dmg"
   if [[ "\${FAKE_NPM_MUTATE_FRAGMENT:-0}" == "1" ]]; then
     printf '构建期间发生变化。\\n' >> .release-notes/release-workflow.md
   fi
@@ -289,9 +289,9 @@ test("real release path commits only metadata, atomically pushes, verifies a dra
     assert.doesNotMatch(body, /dry-run/);
     const assets = JSON.parse(await readFile(path.join(fixture.ghState, "assets.json"), "utf8"));
     assert.deepEqual(Object.keys(assets).sort(), [
-      `fund-pulse-1.0.42-${arch}-swift.dmg`,
-      `fund-pulse-1.0.42-${arch}-swift.zip`,
       "latest-mac.yml",
+      `red-fund-1.0.42-${arch}-swift.dmg`,
+      `red-fund-1.0.42-${arch}-swift.zip`,
     ]);
     const ghCalls = await readFile(fixture.ghLog, "utf8");
     assert.ok(ghCalls.indexOf("release create") < ghCalls.indexOf("release upload"));

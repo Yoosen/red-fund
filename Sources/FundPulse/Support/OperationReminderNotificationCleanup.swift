@@ -25,7 +25,7 @@ struct OperationReminderNotificationRequest: Equatable, Sendable {
 /// 操作提醒通知的固定文案与标识常量。
 enum OperationReminderNotificationContent {
     /// 旧版单条通知标识。
-    static let legacyIdentifier = "fund-pulse.operation-reminder"
+    static let legacyIdentifier = "red-fund.operation-reminder"
     /// 新版按日期拆分通知的标识前缀。
     static let identifierPrefix = "\(legacyIdentifier)."
     /// 通知标题。

@@ -51,7 +51,7 @@ struct FundThresholdReminder: Equatable {
 
     /// 通知的唯一标识。
     var notificationIdentifier: String {
-        "fund-pulse.threshold.\(kind.rawValue).\(dateKey).\(displayCode).\(direction.rawValue).\(thresholdKey)"
+        "red-fund.threshold.\(kind.rawValue).\(dateKey).\(displayCode).\(direction.rawValue).\(thresholdKey)"
     }
 
     /// 通知标题。

@@ -13,7 +13,7 @@ const cliPath = path.join(repositoryRoot, "scripts/release-notes.mjs");
 const validFragment = (type, body) => `---\ntype: ${type}\n---\n\n${body}\n`;
 
 async function withTempDirectory(run) {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "fund-pulse-release-notes-cli-test-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "red-fund-release-notes-cli-test-"));
   try {
     return await run(directory);
   } finally {
@@ -29,7 +29,7 @@ function generateArguments(directory, extra = []) {
     "--version", "1.0.42",
     "--tag", "v1.0.42",
     "--previous-tag", "v1.0.41",
-    "--repository", "iamzjt-front-end/fund-pulse",
+    "--repository", "yoosen/red-fund",
     "--zip-name", "app.zip",
     "--zip-sha", "zip-sha",
     "--dmg-name", "app.dmg",

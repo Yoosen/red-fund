@@ -805,7 +805,7 @@ final class JDFinanceHoldingsSyncStore {
     private static func debugPreviewURL() -> URL {
         FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appending(path: "fund-pulse", directoryHint: .isDirectory)
+            .appending(path: "red-fund", directoryHint: .isDirectory)
             .appending(path: "jd-sync-preview-debug.json")
     }
 }

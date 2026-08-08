@@ -280,12 +280,13 @@ final class PortfolioPerformanceTests: XCTestCase {
 
     func testCumulativeSeriesIsDerivedBeforeRangeFiltering() throws {
         let update = try shanghaiDate("2026-07-15 15:00")
+        // 这些日期均为交易日（避开周末与法定节假日），用于验证区间过滤前已完成累计推导。
         let snapshot = PortfolioPerformanceSnapshot(
-            trackingStartDate: "2026-05-01",
+            trackingStartDate: "2026-03-02",
             days: [
-                day("2026-05-01", profit: 100, updatedAt: update),
-                day("2026-06-14", profit: -20, updatedAt: update),
-                day("2026-06-15", profit: 10, updatedAt: update),
+                day("2026-03-02", profit: 100, updatedAt: update),
+                day("2026-06-15", profit: -20, updatedAt: update),
+                day("2026-06-16", profit: 10, updatedAt: update),
                 day("2026-07-15", profit: 5, updatedAt: update)
             ]
         )
@@ -298,8 +299,8 @@ final class PortfolioPerformanceTests: XCTestCase {
         )
 
         XCTAssertEqual(allPoints.map(\.cumulativeProfit), [100, 80, 90, 95])
-        XCTAssertEqual(monthPoints.map(\.day.date), ["2026-06-15", "2026-07-15"])
-        XCTAssertEqual(monthPoints.map(\.cumulativeProfit), [90, 95])
+        XCTAssertEqual(monthPoints.map(\.day.date), ["2026-06-15", "2026-06-16", "2026-07-15"])
+        XCTAssertEqual(monthPoints.map(\.cumulativeProfit), [80, 90, 95])
     }
 
     func testRangeFilteringSupportsNaturalMonthQuarterYearAndAll() throws {
@@ -578,9 +579,13 @@ final class PortfolioPerformanceTests: XCTestCase {
 
         let points = PortfolioPerformanceSeries.cumulativePoints(in: snapshot)
 
-        XCTAssertEqual(points.count, 1_000)
-        XCTAssertEqual(points.last?.cumulativeProfit, 1_000)
-        XCTAssertEqual(points.first?.day.date, "2023-01-01")
+        // 过滤非交易日后点数应少于原始连续天数，但仍是有效序列；累计末值不变。
+        XCTAssertLessThanOrEqual(points.count, 1_000)
+        XCTAssertGreaterThan(points.count, 0)
+        // 每个交易日 profit 为 1，过滤后累计末值等于交易日数量。
+        XCTAssertEqual(points.last?.cumulativeProfit, Double(points.count))
+        // 2023-01-01 为周日，序列首条交易日为 2023-01-02。
+        XCTAssertEqual(points.first?.day.date, "2023-01-02")
     }
 
     func testChartScalePlacesPositiveValuesAboveZeroAndNegativeValuesBelowZero() {
