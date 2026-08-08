@@ -85,7 +85,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-notes-preview
-          path: RELEASE_NOTES_PREVIEW.md
+          path: .release-notes/RELEASE_NOTES_PREVIEW.md
           if-no-files-found: ignore
 
       - name: Create GitHub Release with assets
@@ -98,7 +98,7 @@ jobs:
           files: |
             release/swift/*.dmg
             release/swift/*.zip
-          body_path: RELEASE_NOTES_PREVIEW.md
+          body_path: .release-notes/RELEASE_NOTES_PREVIEW.md
           # ad-hoc 未公证产物仅用于自用/验证，预发布标记便于区分
           prerelease: false
           fail_on_unmatched_files: false

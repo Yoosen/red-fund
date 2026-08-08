@@ -88,7 +88,8 @@ async function main() {
   }
 
   // 同时写文件（供 artifact 上传）并打印到日志。
-  const outPath = path.join(root, "RELEASE_NOTES_PREVIEW.md");
+  // 放在 .release-notes/ 下，避免污染仓库根目录。
+  const outPath = path.join(root, ".release-notes", "RELEASE_NOTES_PREVIEW.md");
   await (await import("node:fs/promises")).writeFile(outPath, entry);
   process.stdout.write(`\n${entry}\n`);
   process.stdout.write(`Release notes preview written to ${outPath}\n`);

@@ -41,3 +41,6 @@ release/swift
 # Local design previews and screenshots
 design
 output
+
+# 发布说明预览（脚本生成，放在 .release-notes/ 下）
+.release-notes/RELEASE_NOTES_PREVIEW.md
